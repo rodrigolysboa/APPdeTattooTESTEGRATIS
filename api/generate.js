@@ -1,15 +1,32 @@
 import { kv } from "@vercel/kv";
 
 export default async function handler(req, res) {
-  // ✅ CORS
+  // ✅ CORS (corrigido e compatível com todos navegadores)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-User-Phone, X-Device-Id");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, X-User-Phone, X-Device-Id"
+  );
   res.setHeader("Cache-Control", "no-store");
 
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method === "GET") return res.status(200).json({ ok: true, message: "API online. Use POST em /api/generate" });
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  // ✅ Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ✅ Healthcheck
+  if (req.method === "GET") {
+    return res.status(200).json({
+      ok: true,
+      message: "API online. Use POST em /api/generate"
+    });
+  }
+
+  // ❌ Bloqueia outros métodos
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
     // =========================
