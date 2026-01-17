@@ -1,0 +1,7 @@
+{
+  "name": "appdetattoo-testegratis15dias",
+  "private": true,
+  "dependencies": {
+    "@vercel/kv": "^1.0.0"
+  }
+}
