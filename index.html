@@ -25,10 +25,16 @@
 <body>
 
   <h1>Teste Grátis — 15 Gerações</h1>
-  <div class="hint">Para liberar o teste, informe um telefone válido (WhatsApp).</div>
+  <div class="hint">Para liberar o teste, informe um WhatsApp válido.</div>
 
-  <input type="tel" id="phone" placeholder="Seu telefone (ex: 55DDDNÚMERO)" autocomplete="tel" inputmode="numeric" />
-  <div class="hint">Dica: use no formato 55 + DDD + número. Ex: 5511999999999</div>
+  <input
+    type="tel"
+    id="phone"
+    placeholder="(11) 99999-9999"
+    autocomplete="tel"
+    inputmode="numeric"
+  />
+  <div class="hint">Vamos usar apenas pra liberar o teste e avisar sobre o plano completo.</div>
 
   <input type="file" id="image" accept="image/*" />
 
@@ -46,7 +52,6 @@
   <div id="erro"></div>
 
   <div id="limitBox"></div>
-
   <div id="resultado"></div>
 
   <script>
@@ -55,15 +60,15 @@
     const erroBox = document.getElementById("erro");
     const limitBox = document.getElementById("limitBox");
     const resultado = document.getElementById("resultado");
+    const phoneInput = document.getElementById("phone");
 
-    // ajuste compatibilidade mobile
     const MAX_FILE_MB = 6;
     const MAX_W = 1200;
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // 🔗 link do seu plano completo
-    const UPGRADE_URL = "https://SEU-LINK-DO-PLANO-AQUI";
+    // ✅ LINK CORRETO DO PLANO
+    const UPGRADE_URL = "https://pay.cakto.com.br/32buk26_725522";
 
     function showError(msg) {
       erroBox.style.display = "block";
@@ -73,25 +78,37 @@
       erroBox.style.display = "none";
       erroBox.textContent = "";
     }
-    function showLimit(used, limit) {
+
+    function showLimit(html) {
       limitBox.style.display = "block";
-      limitBox.innerHTML =
-        `<b>LIMITE ATINGIDO.</b><br><br>` +
-        `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
-        `Clique no link abaixo para adquirir o plano completo de geração ilimitada por apenas <b>R$49,90</b>.<br><br>` +
-        `<a href="${UPGRADE_URL}" target="_blank" rel="noopener">✅ Quero o plano completo</a>`;
+      limitBox.innerHTML = html;
     }
     function hideLimit() {
       limitBox.style.display = "none";
       limitBox.innerHTML = "";
     }
 
-    function normalizePhone(raw) {
-      const digits = String(raw || "").replace(/\D/g, "");
-      // regra simples BR: 12 a 13 dígitos (55 + DDD + 8/9)
-      if (digits.length < 12 || digits.length > 13) return null;
-      if (!digits.startsWith("55")) return null;
-      return digits;
+    // ✅ Máscara BR (DDD + 9 dígitos)
+    function maskPhoneBR(value){
+      const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+      if (digits.length <= 2) return digits ? `(${digits}` : "";
+      if (digits.length <= 6) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+      if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+      return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+    }
+    phoneInput.addEventListener("input", () => {
+      const caretAtEnd = phoneInput.selectionStart === phoneInput.value.length;
+      phoneInput.value = maskPhoneBR(phoneInput.value);
+      if (caretAtEnd) phoneInput.selectionStart = phoneInput.selectionEnd = phoneInput.value.length;
+    });
+
+    function normalizePhoneToE164BR(masked){
+      const digits = String(masked || "").replace(/\D/g, "");
+      // aceita: 10/11 dígitos (DDD+num) -> vira 55...
+      if (digits.length === 10 || digits.length === 11) return "55" + digits;
+      // aceita: 55 + DDD + num
+      if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return digits;
+      return null;
     }
 
     function getDeviceId() {
@@ -127,7 +144,7 @@
       canvas.width = w;
       canvas.height = h;
 
-      const ctx = canvas.getContext("2d", { willReadFrequently: false });
+      const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, w, h);
 
       const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
@@ -139,10 +156,9 @@
       hideLimit();
       resultado.innerHTML = "";
 
-      const phoneRaw = document.getElementById("phone").value;
-      const phone = normalizePhone(phoneRaw);
+      const phone = normalizePhoneToE164BR(phoneInput.value);
       if (!phone) {
-        showError("Informe um telefone válido no formato 55DDDNÚMERO (ex: 5511999999999).");
+        showError("Informe um WhatsApp válido. Ex: (11) 99999-9999");
         return;
       }
 
@@ -173,6 +189,7 @@
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
+        // ✅ CHAMA A API DO PRÓPRIO PROJETO
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: {
@@ -187,8 +204,26 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
+        // ✅ LIMITE 15
         if (res.status === 429 && data?.code === "TRIAL_LIMIT") {
-          showLimit(data.used ?? 15, data.limit ?? 15);
+          showLimit(
+            `<b>LIMITE ATINGIDO.</b><br><br>
+             Você usou <b>${data.used ?? 15}/${data.limit ?? 15}</b> testes grátis.<br>
+             Clique abaixo para adquirir o plano completo (ilimitado) por <b>R$49,90</b>.<br><br>
+             <a href="${UPGRADE_URL}" target="_blank" rel="noopener">✅ Quero o plano completo</a>`
+          );
+          return;
+        }
+
+        // ✅ LIMITE 40/H
+        if (res.status === 429 && data?.code === "HOURLY_LIMIT") {
+          showError("Limite por hora atingido. Tente novamente mais tarde.");
+          return;
+        }
+
+        // ✅ LIMITE 3 DEVICES
+        if (res.status === 403 && data?.code === "DEVICE_LIMIT") {
+          showError("Limite de dispositivos atingido para este telefone.");
           return;
         }
 
@@ -199,7 +234,7 @@
         const img = document.createElement("img");
         img.src = "data:image/png;base64," + data.imageBase64;
 
-        // ✅ clicar na imagem também abre plano (como você pediu)
+        // clicar na imagem abre plano
         img.style.cursor = "pointer";
         img.title = "Clique para adquirir o plano completo";
         img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
