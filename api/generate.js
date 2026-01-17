@@ -1,7 +1,19 @@
-import { kv } from "@vercel/kv";
+import { createClient } from "@vercel/kv";
+
+// ✅ IMPORTANTÍSSIMO: Next tem limite baixo de body.
+// Isso evita erro de payload grande quando manda base64.
+export const config = {
+  api: { bodyParser: { sizeLimit: "6mb" } }
+};
+
+// ✅ Usa STORAGE_ se existir (seu caso), senão cai no padrão KV_
+const kv = createClient({
+  url: process.env.STORAGE_KV_REST_API_URL || process.env.KV_REST_API_URL,
+  token: process.env.STORAGE_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN
+});
 
 export default async function handler(req, res) {
-  // ✅ CORS (corrigido e compatível com todos navegadores)
+  // ✅ CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.setHeader(
@@ -10,23 +22,13 @@ export default async function handler(req, res) {
   );
   res.setHeader("Cache-Control", "no-store");
 
-  // ✅ Preflight
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "GET")
+    return res
+      .status(200)
+      .json({ ok: true, message: "API online. Use POST em /api/generate" });
 
-  // ✅ Healthcheck
-  if (req.method === "GET") {
-    return res.status(200).json({
-      ok: true,
-      message: "API online. Use POST em /api/generate"
-    });
-  }
-
-  // ❌ Bloqueia outros métodos
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     // =========================
@@ -38,7 +40,6 @@ export default async function handler(req, res) {
     const phone = typeof phoneRaw === "string" ? phoneRaw.replace(/\D/g, "") : "";
     const deviceId = typeof deviceRaw === "string" ? deviceRaw.trim() : "";
 
-    // validação simples BR: 55 + DDD + 8/9
     if (!(phone.startsWith("55") && phone.length >= 12 && phone.length <= 13)) {
       return res.status(401).json({ error: "Missing or invalid phone" });
     }
@@ -47,32 +48,54 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // ✅ CONTROLE: 15 testes por telefone
+    // ✅ LIMITES
     // =========================
     const TRIAL_LIMIT = 15;
+    const DEVICES_LIMIT = 3;
+    const PER_HOUR_LIMIT = 40;
 
-    // guarda também os devices usados no trial (pra dificultar abuso)
     const devicesKey = `trial:devices:${phone}`;
     const usedKey = `trial:used:${phone}`;
+    const leadKey = `lead:${phone}`;
+
+    // ✅ 40 por hora (anti-bot)
+    const hourKey = `rl:${phone}:${Math.floor(Date.now() / 3600000)}`;
+    const hourCount = await kv.incr(hourKey);
+    if (hourCount === 1) await kv.expire(hourKey, 60 * 60); // 1h
+    if (hourCount > PER_HOUR_LIMIT) {
+      return res.status(429).json({
+        error: "Hourly limit reached",
+        code: "HOURLY_LIMIT",
+        used: PER_HOUR_LIMIT,
+        limit: PER_HOUR_LIMIT
+      });
+    }
+
+    // ✅ Limite 3 devices (bloqueia 4º)
+    const isKnown = await kv.sismember(devicesKey, deviceId);
+    const deviceCount = await kv.scard(devicesKey);
+
+    if (!isKnown && deviceCount >= DEVICES_LIMIT) {
+      return res.status(403).json({
+        error: "Device limit reached",
+        code: "DEVICE_LIMIT",
+        limit: DEVICES_LIMIT
+      });
+    }
 
     // registra device
     await kv.sadd(devicesKey, deviceId);
     await kv.expire(devicesKey, 60 * 60 * 24 * 180); // 180 dias
 
-    // incrementa contador de uso
+    // ✅ 15 testes por telefone
     const used = await kv.incr(usedKey);
     if (used === 1) {
-      await kv.expire(usedKey, 60 * 60 * 24 * 180); // 180 dias
-      // salva lead (primeiro uso)
-      await kv.hset(`lead:${phone}`, {
-        phone,
-        first_seen: Date.now().toString()
-      });
-      await kv.expire(`lead:${phone}`, 60 * 60 * 24 * 365); // 1 ano
+      await kv.expire(usedKey, 60 * 60 * 24 * 180);
+      await kv.hset(leadKey, { phone, first_seen: String(Date.now()) });
+      await kv.expire(leadKey, 60 * 60 * 24 * 365);
     } else {
-      // atualiza último uso
-      await kv.hset(`lead:${phone}`, { last_seen: Date.now().toString() });
-      await kv.expire(`lead:${phone}`, 60 * 60 * 24 * 365);
+      await kv.hset(leadKey, { last_seen: String(Date.now()) });
+      await kv.expire(leadKey, 60 * 60 * 24 * 365);
     }
 
     if (used > TRIAL_LIMIT) {
@@ -85,13 +108,14 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // ✅ GERAÇÃO NORMAL (mesma qualidade)
+    // ✅ GERAÇÃO (mesma qualidade)
     // =========================
-    const { imageBase64, style = "clean", mimeType = "image/jpeg", prompt = "" } = req.body || {};
+    const { imageBase64, style = "clean", mimeType = "image/jpeg", prompt = "" } =
+      req.body || {};
 
     if (!imageBase64) return res.status(400).json({ error: "imageBase64 is required" });
 
-    // proteção básica de payload
+    // proteção básica
     const MAX_BASE64_LEN = 4_500_000;
     if (typeof imageBase64 !== "string" || imageBase64.length > MAX_BASE64_LEN) {
       return res.status(413).json({ error: "Image payload too large. Compress and try again." });
@@ -108,54 +132,32 @@ export default async function handler(req, res) {
         ? `\n\nOBSERVAÇÕES DO TATUADOR (use apenas se fizer sentido): ${prompt.trim()}`
         : "";
 
-    // ✅ PROMPTS (use o seu LINE/SHADOW e o CLEAN ajustado)
     const prompts = {
       line: `
 OBJETIVO (MODO LINE / DECALQUE DE LINHAS):
-Você receberá uma FOTO de uma tatuagem aplicada na PELE.
-Sua tarefa é IDENTIFICAR e RECRIAR a MESMA ARTE como LINE ART em uma FOLHA A4 BRANCA, vista de cima.
-
-REGRAS:
-- APENAS linhas pretas (sem sombras, sem cinza, sem textura, sem pele).
+Recriar a tatuagem como LINE ART em uma folha A4 branca (vista de cima).
+- Apenas linhas pretas (sem sombras/cinza/textura/pele).
 - Corrigir perspectiva/curvatura e deixar plano em papel.
 - Completar partes faltantes SEM inventar elementos novos.
-- Se houver texto/lettering, reescrever fielmente.
-
-SAÍDA:
-- Fundo branco puro, estilo folha A4, sem objetos, sem UI.
+- Lettering fiel se existir.
+SAÍDA: folha A4 branca, sem UI, sem objetos extras.
 `,
-
       shadow: `
 OBJETIVO (MODO SHADOW / LINHAS + SOMBRA LEVE):
-Transformar foto de tattoo em desenho em folha A4 branca.
-- Prioridade máxima: linhas.
-- Permitir sombra LEVE e CONTROLADA, sem textura de pele.
+Recriar em A4 branca com linhas priorizadas e sombra leve controlada.
+- Sem textura de pele, sem sujeira.
 - Completar partes faltantes sem inventar.
 - Lettering fiel se existir.
-- Folha A4 branca vista de cima, mesa de madeira clara discreta.
+SAÍDA: folha A4 vista de cima, mesa de madeira clara bem discreta.
 `,
-
       clean: `
 OBJETIVO (MODO CLEAN / TATUAGEM → DESENHO IDÊNTICO):
-Você receberá uma FOTO de uma tatuagem real aplicada na PELE.
-Sua tarefa é TRANSFORMAR essa tatuagem no MESMO DESENHO, exatamente como ela é,
-apenas corrigindo a deformação do corpo e trazendo a arte para uma FOLHA A4 BRANCA.
-
-REGRA PRINCIPAL:
-- O DESENHO FINAL DEVE SER VISUALMENTE IGUAL À TATUAGEM ORIGINAL.
-- Mesmas linhas, mesmas sombras, mesmas luzes, mesmo peso de preto, mesmo estilo.
-- NÃO estilize, NÃO interprete, NÃO simplifique, NÃO embeleze.
-
-O QUE FAZER:
-1) Extraia somente a tatuagem (ignore pele, pelos, textura, reflexos, fundo).
-2) Corrija curvatura/perspectiva de forma INVISÍVEL (sem alterar a arte).
-3) Complete partes faltantes usando continuidade real do desenho (SEM inventar).
-4) Lettering idêntico (se existir).
-
-SAÍDA:
-- Folha A4 branca realista, vista de cima.
-- Arte centralizada com margens naturais.
-- Fundo limpo, sem objetos, sem watermark, sem interface.
+Transformar a tattoo aplicada na pele em desenho em A4 branca,
+mantendo o MESMO visual da tatuagem (linhas/sombras/luzes/peso de preto).
+- Corrigir curvatura/perspectiva SEM alterar a arte.
+- Completar partes faltantes por continuidade real (SEM inventar).
+- Lettering idêntico se existir.
+SAÍDA: folha A4 branca realista vista de cima, fundo limpo, sem UI/watermark.
 `
     };
 
@@ -177,15 +179,12 @@ SAÍDA:
                 userNote +
                 "\n\nIMPORTANTE: Gere SOMENTE a imagem final. Não retorne texto."
             },
-            {
-              inlineData: { mimeType: safeMime, data: imageBase64 }
-            }
+            { inlineData: { mimeType: safeMime, data: imageBase64 } }
           ]
         }
       ]
     };
 
-    // timeout
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 60000);
 
@@ -210,17 +209,16 @@ SAÍDA:
     const parts = json?.candidates?.[0]?.content?.parts || [];
     const inline = parts.find((p) => p?.inlineData?.data)?.inlineData?.data;
 
-    if (!inline) {
-      return res.status(500).json({ error: "No image returned", raw: json });
-    }
+    if (!inline) return res.status(500).json({ error: "No image returned", raw: json });
 
     return res.status(200).json({
       imageBase64: inline,
-      trial: { used, limit: TRIAL_LIMIT }
+      trial: { used, limit: TRIAL_LIMIT },
+      hourly: { used: hourCount, limit: PER_HOUR_LIMIT }
     });
-
   } catch (err) {
-    const msg = err?.name === "AbortError" ? "Timeout generating image" : (err?.message || "Unexpected error");
+    const msg =
+      err?.name === "AbortError" ? "Timeout generating image" : err?.message || "Unexpected error";
     return res.status(500).json({ error: msg });
   }
 }
