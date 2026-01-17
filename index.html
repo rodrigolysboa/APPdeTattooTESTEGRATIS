@@ -2,105 +2,50 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>APP de Tatuagem</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Teste Grátis — Gerador de Arte</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
-      text-align: center;
-      padding: 40px;
+    body { font-family: Arial, sans-serif; background:#111; color:#fff; text-align:center; padding:32px; }
+    input, textarea, button, select {
+      width:100%; max-width:420px; margin:10px auto; padding:12px;
+      border-radius:8px; border:none; font-size:16px; display:block;
     }
-    input, textarea, button {
-      width: 100%;
-      max-width: 420px;
-      margin: 10px auto;
-      padding: 12px;
-      border-radius: 6px;
-      border: none;
-      font-size: 16px;
-      display: block;
-    }
-    button {
-      background: #ff0055;
-      color: #fff;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    #loader {
-      display: none;
-      margin: 12px auto 0;
-      max-width: 420px;
-      font-size: 14px;
-      opacity: 0.9;
-    }
-    #erro {
-      display: none;
-      margin: 12px auto 0;
-      max-width: 420px;
-      background: rgba(255,0,85,0.15);
-      border: 1px solid rgba(255,0,85,0.4);
-      padding: 10px;
-      border-radius: 8px;
-      text-align: left;
-      font-size: 14px;
-      white-space: pre-wrap;
-    }
-    img {
-      max-width: 420px;
-      width: 100%;
-      margin-top: 18px;
-      border-radius: 10px;
-      background: #fff;
-    }
-    .hint {
-      max-width: 420px;
-      margin: 6px auto 0;
-      font-size: 12px;
-      opacity: 0.75;
-    }
-    .row {
-      max-width: 420px;
-      margin: 0 auto;
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    select {
-      width: 100%;
-      max-width: 420px;
-      margin: 10px auto;
-      padding: 12px;
-      border-radius: 6px;
-      border: none;
-      font-size: 16px;
-      display: block;
-    }
+    button { background:#ff0055; color:#fff; cursor:pointer; font-weight:bold; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    #loader { display:none; margin:12px auto 0; max-width:420px; font-size:14px; opacity:.9; }
+    #erro { display:none; margin:12px auto 0; max-width:420px; background:rgba(255,0,85,.15);
+      border:1px solid rgba(255,0,85,.4); padding:10px; border-radius:10px; text-align:left; font-size:14px; white-space:pre-wrap; }
+    #limitBox { display:none; margin:14px auto 0; max-width:420px; background:rgba(0,200,120,.12);
+      border:1px solid rgba(0,200,120,.35); padding:12px; border-radius:12px; text-align:left; }
+    #limitBox a { color:#7CFFB7; font-weight:bold; text-decoration:underline; }
+    img { max-width:420px; width:100%; margin-top:18px; border-radius:12px; background:#fff; }
+    .hint { max-width:420px; margin:6px auto 0; font-size:12px; opacity:.75; }
   </style>
 </head>
 <body>
 
-  <h1>Gerador de Arte para Tatuagem</h1>
+  <h1>Teste Grátis — 15 Gerações</h1>
+  <div class="hint">Para liberar o teste, informe um telefone válido (WhatsApp).</div>
+
+  <input type="tel" id="phone" placeholder="Seu telefone (ex: 55DDDNÚMERO)" autocomplete="tel" inputmode="numeric" />
+  <div class="hint">Dica: use no formato 55 + DDD + número. Ex: 5511999999999</div>
 
   <input type="file" id="image" accept="image/*" />
 
   <select id="style">
     <option value="line">Modo 1 — Decalque linhas (line art puro)</option>
     <option value="shadow">Modo 2 — Linhas + sombra leve</option>
-    <option value="clean">Modo 3 — Tatuagem → desenho limpo</option>
+    <option value="clean" selected>Modo 3 — Tatuagem → desenho clean</option>
   </select>
 
-  <textarea id="prompt" placeholder="(Opcional) Observações: ex: traço fino, line art, completar partes escondidas..."></textarea>
+  <textarea id="prompt" placeholder="(Opcional) Observações: ex: traço fino, completar parte escondida..."></textarea>
 
-  <button id="btnGerar">Gerar Arte</button>
+  <button id="btnGerar">Gerar Arte (Teste)</button>
 
   <div id="loader">⏳ Gerando... (não feche a página)</div>
   <div id="erro"></div>
+
+  <div id="limitBox"></div>
 
   <div id="resultado"></div>
 
@@ -108,14 +53,17 @@
     const btn = document.getElementById("btnGerar");
     const loader = document.getElementById("loader");
     const erroBox = document.getElementById("erro");
+    const limitBox = document.getElementById("limitBox");
     const resultado = document.getElementById("resultado");
 
-    // ✅ limites (ajuste se quiser)
-    const MAX_FILE_MB = 6;            // limite do arquivo original (mais seguro pro usuário)
-    const MAX_W = 1200;               // melhor detalhamento sem explodir payload
-    const JPEG_QUALITY = 0.86;        // compressão boa p/ tattoo
-    const MAX_BASE64_LEN = 4_500_000; // limite aproximado do base64 (evita travas)
-    const API_TIMEOUT_MS = 60_000;    // timeout da chamada da API
+    // ajuste compatibilidade mobile
+    const MAX_FILE_MB = 6;
+    const MAX_W = 1200;
+    const JPEG_QUALITY = 0.86;
+    const API_TIMEOUT_MS = 60000;
+
+    // 🔗 link do seu plano completo
+    const UPGRADE_URL = "https://SEU-LINK-DO-PLANO-AQUI";
 
     function showError(msg) {
       erroBox.style.display = "block";
@@ -125,8 +73,37 @@
       erroBox.style.display = "none";
       erroBox.textContent = "";
     }
+    function showLimit(used, limit) {
+      limitBox.style.display = "block";
+      limitBox.innerHTML =
+        `<b>LIMITE ATINGIDO.</b><br><br>` +
+        `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
+        `Clique no link abaixo para adquirir o plano completo de geração ilimitada por apenas <b>R$49,90</b>.<br><br>` +
+        `<a href="${UPGRADE_URL}" target="_blank" rel="noopener">✅ Quero o plano completo</a>`;
+    }
+    function hideLimit() {
+      limitBox.style.display = "none";
+      limitBox.innerHTML = "";
+    }
 
-    // ✅ Converte e comprime antes de base64 (evita payload gigante)
+    function normalizePhone(raw) {
+      const digits = String(raw || "").replace(/\D/g, "");
+      // regra simples BR: 12 a 13 dígitos (55 + DDD + 8/9)
+      if (digits.length < 12 || digits.length > 13) return null;
+      if (!digits.startsWith("55")) return null;
+      return digits;
+    }
+
+    function getDeviceId() {
+      const key = "__trial_device_id__";
+      let id = localStorage.getItem(key);
+      if (!id) {
+        id = (crypto?.randomUUID?.() || ("dev_" + Math.random().toString(16).slice(2) + Date.now()));
+        localStorage.setItem(key, id);
+      }
+      return id;
+    }
+
     async function fileToBase64Compressed(file) {
       const img = await new Promise((resolve, reject) => {
         const url = URL.createObjectURL(file);
@@ -153,18 +130,21 @@
       const ctx = canvas.getContext("2d", { willReadFrequently: false });
       ctx.drawImage(img, 0, 0, w, h);
 
-      // ✅ padroniza JPEG (leve e consistente com a API)
       const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-
-      return {
-        base64: dataUrl.split(",")[1],
-        mimeType: "image/jpeg"
-      };
+      return { base64: dataUrl.split(",")[1], mimeType: "image/jpeg" };
     }
 
     async function gerar() {
       clearError();
+      hideLimit();
       resultado.innerHTML = "";
+
+      const phoneRaw = document.getElementById("phone").value;
+      const phone = normalizePhone(phoneRaw);
+      if (!phone) {
+        showError("Informe um telefone válido no formato 55DDDNÚMERO (ex: 5511999999999).");
+        return;
+      }
 
       const file = document.getElementById("image").files[0];
       const style = document.getElementById("style").value;
@@ -175,7 +155,6 @@
         return;
       }
 
-      // ✅ Limite do arquivo original
       const mb = file.size / (1024 * 1024);
       if (mb > MAX_FILE_MB) {
         showError(`Arquivo muito grande (${mb.toFixed(2)}MB). Use até ${MAX_FILE_MB}MB.`);
@@ -189,44 +168,47 @@
 
       try {
         const { base64: imageBase64, mimeType } = await fileToBase64Compressed(file);
+        const deviceId = getDeviceId();
 
-        // ✅ trava por segurança (mesmo após compressão)
-        if (imageBase64.length > MAX_BASE64_LEN) {
-          throw new Error("Imagem ainda ficou pesada após compressão. Tente uma foto mais próxima/menor.");
-        }
-
-        // ✅ timeout na requisição
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
         const res = await fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Phone": phone,
+            "X-Device-Id": deviceId
+          },
           signal: controller.signal,
-          body: JSON.stringify({
-            imageBase64,
-            mimeType,
-            style,
-            prompt
-          })
+          body: JSON.stringify({ imageBase64, mimeType, style, prompt })
         });
 
         clearTimeout(t);
-
         const data = await res.json().catch(() => ({}));
 
+        if (res.status === 429 && data?.code === "TRIAL_LIMIT") {
+          showLimit(data.used ?? 15, data.limit ?? 15);
+          return;
+        }
+
         if (!res.ok || !data.imageBase64) {
-          const msg = data?.error ? String(data.error) : `Erro ao gerar imagem (status ${res.status})`;
-          throw new Error(msg);
+          throw new Error(data?.error || `Erro ao gerar (status ${res.status})`);
         }
 
         const img = document.createElement("img");
         img.src = "data:image/png;base64," + data.imageBase64;
+
+        // ✅ clicar na imagem também abre plano (como você pediu)
+        img.style.cursor = "pointer";
+        img.title = "Clique para adquirir o plano completo";
+        img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
+
         resultado.appendChild(img);
 
       } catch (err) {
         const isTimeout = err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort"));
-        showError("Erro: " + (isTimeout ? "Tempo excedido na geração. Tente novamente." : (err?.message || String(err))));
+        showError("Erro: " + (isTimeout ? "Tempo excedido. Tente novamente." : (err?.message || String(err))));
       } finally {
         loader.style.display = "none";
         btn.disabled = false;
