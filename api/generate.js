@@ -1,120 +1,121 @@
+import { kv } from "@vercel/kv";
+
 export default async function handler(req, res) {
   // ✅ CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-User-Phone, X-Device-Id");
+  res.setHeader("Cache-Control", "no-store");
 
-  // ✅ Preflight
   if (req.method === "OPTIONS") return res.status(200).end();
-
-  // ✅ Healthcheck
-  if (req.method === "GET") {
-    return res.status(200).json({ ok: true, message: "API online. Use POST em /api/generate" });
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method === "GET") return res.status(200).json({ ok: true, message: "API online. Use POST em /api/generate" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const {
-      imageBase64,
-      style = "clean",
-      mimeType = "image/jpeg",
-      prompt = ""
-    } = req.body || {};
+    // =========================
+    // ✅ IDENTIFICA (Telefone + Device)
+    // =========================
+    const phoneRaw = req.headers["x-user-phone"];
+    const deviceRaw = req.headers["x-device-id"];
 
-    // ✅ valida base64
-    if (!imageBase64 || typeof imageBase64 !== "string") {
-      return res.status(400).json({ error: "imageBase64 is required (string)" });
+    const phone = typeof phoneRaw === "string" ? phoneRaw.replace(/\D/g, "") : "";
+    const deviceId = typeof deviceRaw === "string" ? deviceRaw.trim() : "";
+
+    // validação simples BR: 55 + DDD + 8/9
+    if (!(phone.startsWith("55") && phone.length >= 12 && phone.length <= 13)) {
+      return res.status(401).json({ error: "Missing or invalid phone" });
+    }
+    if (!deviceId || deviceId.length < 8) {
+      return res.status(401).json({ error: "Missing or invalid device id" });
     }
 
-    // ✅ limita tamanho do payload (base64 é grande)
-    // Ajuste se necessário, mas isso evita travar/vercel memory spike
-    const MAX_BASE64_LEN = 4_500_000;
-    if (imageBase64.length > MAX_BASE64_LEN) {
-      return res.status(413).json({
-        error: "Image payload too large. Please compress the image and try again."
+    // =========================
+    // ✅ CONTROLE: 15 testes por telefone
+    // =========================
+    const TRIAL_LIMIT = 15;
+
+    // guarda também os devices usados no trial (pra dificultar abuso)
+    const devicesKey = `trial:devices:${phone}`;
+    const usedKey = `trial:used:${phone}`;
+
+    // registra device
+    await kv.sadd(devicesKey, deviceId);
+    await kv.expire(devicesKey, 60 * 60 * 24 * 180); // 180 dias
+
+    // incrementa contador de uso
+    const used = await kv.incr(usedKey);
+    if (used === 1) {
+      await kv.expire(usedKey, 60 * 60 * 24 * 180); // 180 dias
+      // salva lead (primeiro uso)
+      await kv.hset(`lead:${phone}`, {
+        phone,
+        first_seen: Date.now().toString()
+      });
+      await kv.expire(`lead:${phone}`, 60 * 60 * 24 * 365); // 1 ano
+    } else {
+      // atualiza último uso
+      await kv.hset(`lead:${phone}`, { last_seen: Date.now().toString() });
+      await kv.expire(`lead:${phone}`, 60 * 60 * 24 * 365);
+    }
+
+    if (used > TRIAL_LIMIT) {
+      return res.status(429).json({
+        error: "Trial limit reached",
+        code: "TRIAL_LIMIT",
+        used: TRIAL_LIMIT,
+        limit: TRIAL_LIMIT
       });
     }
 
-    // ✅ whitelist style
+    // =========================
+    // ✅ GERAÇÃO NORMAL (mesma qualidade)
+    // =========================
+    const { imageBase64, style = "clean", mimeType = "image/jpeg", prompt = "" } = req.body || {};
+
+    if (!imageBase64) return res.status(400).json({ error: "imageBase64 is required" });
+
+    // proteção básica de payload
+    const MAX_BASE64_LEN = 4_500_000;
+    if (typeof imageBase64 !== "string" || imageBase64.length > MAX_BASE64_LEN) {
+      return res.status(413).json({ error: "Image payload too large. Compress and try again." });
+    }
+
     const allowedStyles = new Set(["line", "shadow", "clean"]);
     const safeStyle = allowedStyles.has(style) ? style : "clean";
 
-    // ✅ whitelist mime
     const allowedMime = new Set(["image/jpeg", "image/png", "image/webp"]);
     const safeMime = allowedMime.has(mimeType) ? mimeType : "image/jpeg";
 
-    // ✅ prompt opcional do tatuador (controlado)
     const userNote =
       typeof prompt === "string" && prompt.trim().length
-        ? `\n\nOBSERVAÇÕES DO TATUADOR (use apenas se fizer sentido e sem quebrar as regras): ${prompt.trim()}`
+        ? `\n\nOBSERVAÇÕES DO TATUADOR (use apenas se fizer sentido): ${prompt.trim()}`
         : "";
 
+    // ✅ PROMPTS (use o seu LINE/SHADOW e o CLEAN ajustado)
     const prompts = {
       line: `
 OBJETIVO (MODO LINE / DECALQUE DE LINHAS):
-Você receberá uma FOTO de uma tatuagem aplicada na PELE (com curvatura, sombras, reflexos, textura, pelos, perspectiva e possíveis partes cortadas).
-Sua tarefa é IDENTIFICAR com precisão a tatuagem e RECRIAR a MESMA ARTE como um DESENHO NOVO em uma FOLHA A4 BRANCA, vista de cima, pronto para impressão de estêncil.
+Você receberá uma FOTO de uma tatuagem aplicada na PELE.
+Sua tarefa é IDENTIFICAR e RECRIAR a MESMA ARTE como LINE ART em uma FOLHA A4 BRANCA, vista de cima.
 
-O QUE VOCÊ DEVE FAZER (PASSO A PASSO):
-1) ISOLAR A TATUAGEM:
-   - Detecte exatamente quais traços pertencem à tatuagem.
-   - Ignore COMPLETAMENTE: pele, poros, pelos, brilho, reflexos, fundo, roupas, ambiente, sombras da foto, bordas do corpo.
+REGRAS:
+- APENAS linhas pretas (sem sombras, sem cinza, sem textura, sem pele).
+- Corrigir perspectiva/curvatura e deixar plano em papel.
+- Completar partes faltantes SEM inventar elementos novos.
+- Se houver texto/lettering, reescrever fielmente.
 
-2) “DESENROLAR” A TATUAGEM (PLANO 2D):
-   - Corrija rotação, perspectiva e deformações da pele.
-   - Reprojete a tatuagem como se estivesse perfeitamente plana em papel.
-
-3) RECONSTRUÇÃO OBRIGATÓRIA (SEM INVENTAR):
-   - Se houver partes escondidas, cortadas, borradas ou fora do enquadramento: reconstrua fielmente usando simetria, continuidade e o padrão do próprio desenho.
-   - É PROIBIDO criar elementos novos que não existam na tatuagem original.
-
-4) LETTERING / TEXTO (OBRIGATÓRIO SE EXISTIR):
-   - Decifre as letras mesmo que estejam borradas.
-   - Reescreva com alinhamento correto, espaçamento consistente e forma fiel ao estilo do lettering.
-
-SAÍDA FINAL (MUITO IMPORTANTE):
-- Resultado deve ser APENAS LINE ART: SOMENTE LINHAS pretas.
-- PROIBIDO: sombras, degradês, cinza, preenchimentos, manchas, textura, pontilhismo, realismo, efeito pele.
-- Linhas nítidas, contínuas, bem definidas, com espessura coerente ao desenho original.
-- Fundo: branco puro (#FFFFFF), sem mesa, sem sombras, sem textura (apenas papel branco).
-- Aparência de “folha A4” apenas por proporção e margens (sem cenário).
-- Sem marcas d’água, sem molduras, sem UI, sem celular, sem texto extra.
+SAÍDA:
+- Fundo branco puro, estilo folha A4, sem objetos, sem UI.
 `,
 
       shadow: `
 OBJETIVO (MODO SHADOW / LINHAS + SOMBRA LEVE):
-Você receberá uma FOTO de uma tatuagem na PELE. Sua tarefa é IDENTIFICAR a tatuagem com precisão e RECRIAR a MESMA ARTE como um DESENHO NOVO em uma FOLHA A4 BRANCA, vista de cima, pronto para imprimir.
-
-PASSO A PASSO:
-1) ISOLAR A TATUAGEM:
-   - Extraia somente o que é tinta da tatuagem.
-   - Ignore pele, reflexos, fundo, ambiente e qualquer ruído.
-
-2) PLANO 2D:
-   - Corrija curvatura do braço/perna e perspectiva.
-   - Recrie a tatuagem totalmente plana, proporções corretas.
-
-3) RECONSTRUÇÃO OBRIGATÓRIA (SEM INVENTAR):
-   - Complete partes ocultas/cortadas mantendo fidelidade total.
-   - NÃO adicione novos símbolos, ornamentos ou detalhes inexistentes.
-
-4) LETTERING (SE EXISTIR):
-   - Decifre e reescreva com alinhamento perfeito e traço consistente.
-
-REGRAS DE ESTILO (DIFERENÇA DO LINE):
-- Prioridade máxima: LINHAS.
-- SOMBRA: permitir SOMENTE sombra LEVE e CONTROLADA para sugerir volume.
-- A sombra deve ser minimalista, sem “realismo pesado”.
-- Permitido preenchimento sólido APENAS quando fizer parte do desenho original (áreas pretas sólidas do tattoo).
-- Proibido: textura de pele, manchas, cinza sujo, degradê excessivo, sombreado fotográfico.
-
-SAÍDA FINAL:
-- Folha A4 branca (#FFFFFF), sobre mesa de madeira clara discreta, vista de cima.
-- Arte centralizada, limpa, alto contraste.
-- Sem marca d’água, sem molduras, sem UI, sem texto fora da tatuagem.
+Transformar foto de tattoo em desenho em folha A4 branca.
+- Prioridade máxima: linhas.
+- Permitir sombra LEVE e CONTROLADA, sem textura de pele.
+- Completar partes faltantes sem inventar.
+- Lettering fiel se existir.
+- Folha A4 branca vista de cima, mesa de madeira clara discreta.
 `,
 
       clean: `
@@ -123,39 +124,21 @@ Você receberá uma FOTO de uma tatuagem real aplicada na PELE.
 Sua tarefa é TRANSFORMAR essa tatuagem no MESMO DESENHO, exatamente como ela é,
 apenas corrigindo a deformação do corpo e trazendo a arte para uma FOLHA A4 BRANCA.
 
-REGRA PRINCIPAL (MUITO IMPORTANTE):
+REGRA PRINCIPAL:
 - O DESENHO FINAL DEVE SER VISUALMENTE IGUAL À TATUAGEM ORIGINAL.
 - Mesmas linhas, mesmas sombras, mesmas luzes, mesmo peso de preto, mesmo estilo.
 - NÃO estilize, NÃO interprete, NÃO simplifique, NÃO embeleze.
 
-O QUE VOCÊ DEVE FAZER:
-1) EXTRAÇÃO PRECISA:
-   - Separe somente a tatuagem.
-   - Ignore completamente pele, pelos, textura da pele, reflexos, fundo, roupa e ambiente.
+O QUE FAZER:
+1) Extraia somente a tatuagem (ignore pele, pelos, textura, reflexos, fundo).
+2) Corrija curvatura/perspectiva de forma INVISÍVEL (sem alterar a arte).
+3) Complete partes faltantes usando continuidade real do desenho (SEM inventar).
+4) Lettering idêntico (se existir).
 
-2) CORREÇÃO INVISÍVEL (PLANO 2D):
-   - Corrija curvatura do braço/perna e perspectiva.
-   - Ajuste proporções apenas o necessário para que o desenho fique plano em papel.
-   - A correção NÃO pode alterar o visual da arte.
-
-3) RECONSTRUÇÃO FIEL (SEM INVENTAR):
-   - Complete partes que não aparecem na foto usando continuidade real do desenho.
-   - É PROIBIDO criar novos elementos ou mudar o estilo original.
-
-4) LETTERING (SE EXISTIR):
-   - Recrie o texto exatamente como na tatuagem.
-   - Mesmo estilo, mesma espessura, mesmo espaçamento.
-
-REGRAS DE ESTILO (CLEAN):
-- Manter TODAS as sombras, volumes, contrastes e áreas pretas do desenho original.
-- Sombras suaves e naturais, sem textura de pele.
-- Alto nível de fidelidade, como um decalque perfeito do tattoo para o papel.
-
-SAÍDA FINAL:
-- Uma folha A4 branca limpa, vista de cima.
-- Arte centralizada, com margens naturais.
-- Fundo branco real, sem objetos extras, sem mãos, sem marcas d’água, sem interface.
-- Entregar SOMENTE a imagem final.
+SAÍDA:
+- Folha A4 branca realista, vista de cima.
+- Arte centralizada com margens naturais.
+- Fundo limpo, sem objetos, sem watermark, sem interface.
 `
     };
 
@@ -175,38 +158,31 @@ SAÍDA FINAL:
               text:
                 (prompts[safeStyle] || prompts.clean) +
                 userNote +
-                "\n\nIMPORTANTE: Gere SOMENTE a imagem final. Não explique nada. Não retorne texto."
+                "\n\nIMPORTANTE: Gere SOMENTE a imagem final. Não retorne texto."
             },
             {
-              inlineData: {
-                mimeType: safeMime,
-                data: imageBase64
-              }
+              inlineData: { mimeType: safeMime, data: imageBase64 }
             }
           ]
         }
       ]
     };
 
-    // ✅ timeout pra não ficar preso
+    // timeout
     const controller = new AbortController();
-    const TIMEOUT_MS = 60_000;
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), 60000);
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: controller.signal
-    }).catch((e) => {
-      throw new Error(e?.name === "AbortError" ? "Gemini timeout" : (e?.message || "Fetch failed"));
     });
 
     clearTimeout(timer);
 
     const json = await response.json().catch(() => ({}));
 
-    // ✅ se deu erro, devolve claro pro front
     if (!response.ok) {
       return res.status(response.status).json({
         error: json?.error?.message || "Gemini API error",
@@ -218,22 +194,16 @@ SAÍDA FINAL:
     const inline = parts.find((p) => p?.inlineData?.data)?.inlineData?.data;
 
     if (!inline) {
-      const blockReason = json?.promptFeedback?.blockReason;
-      return res.status(500).json({
-        error: blockReason ? `Blocked: ${blockReason}` : "No image returned",
-        raw: json
-      });
+      return res.status(500).json({ error: "No image returned", raw: json });
     }
 
-    // ✅ evita cachear respostas
-    res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({ imageBase64: inline });
+    return res.status(200).json({
+      imageBase64: inline,
+      trial: { used, limit: TRIAL_LIMIT }
+    });
 
   } catch (err) {
-    const msg =
-      err?.name === "AbortError"
-        ? "Timeout generating image"
-        : (err?.message || "Unexpected error");
+    const msg = err?.name === "AbortError" ? "Timeout generating image" : (err?.message || "Unexpected error");
     return res.status(500).json({ error: msg });
   }
 }
