@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>APP de Tatuagem</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      padding: 40px;
+    }
+    input, textarea, button {
+      width: 100%;
+      max-width: 420px;
+      margin: 10px auto;
+      padding: 12px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+      display: block;
+    }
+    button {
+      background: #ff0055;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #loader {
+      display: none;
+      margin: 12px auto 0;
+      max-width: 420px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    #erro {
+      display: none;
+      margin: 12px auto 0;
+      max-width: 420px;
+      background: rgba(255,0,85,0.15);
+      border: 1px solid rgba(255,0,85,0.4);
+      padding: 10px;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    img {
+      max-width: 420px;
+      width: 100%;
+      margin-top: 18px;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .hint {
+      max-width: 420px;
+      margin: 6px auto 0;
+      font-size: 12px;
+      opacity: 0.75;
+    }
+    .row {
+      max-width: 420px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    select {
+      width: 100%;
+      max-width: 420px;
+      margin: 10px auto;
+      padding: 12px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Gerador de Arte para Tatuagem</h1>
+
+  <input type="file" id="image" accept="image/*" />
+
+  <select id="style">
+    <option value="line">Modo 1 — Decalque linhas (line art puro)</option>
+    <option value="shadow">Modo 2 — Linhas + sombra leve</option>
+    <option value="clean">Modo 3 — Tatuagem → desenho limpo</option>
+  </select>
+
+  <textarea id="prompt" placeholder="(Opcional) Observações: ex: traço fino, line art, completar partes escondidas..."></textarea>
+
+  <button id="btnGerar">Gerar Arte</button>
+
+  <div id="loader">⏳ Gerando... (não feche a página)</div>
+  <div id="erro"></div>
+
+  <div id="resultado"></div>
+
+  <script>
+    const btn = document.getElementById("btnGerar");
+    const loader = document.getElementById("loader");
+    const erroBox = document.getElementById("erro");
+    const resultado = document.getElementById("resultado");
+
+    // ✅ limites (ajuste se quiser)
+    const MAX_FILE_MB = 6;            // limite do arquivo original (mais seguro pro usuário)
+    const MAX_W = 1200;               // melhor detalhamento sem explodir payload
+    const JPEG_QUALITY = 0.86;        // compressão boa p/ tattoo
+    const MAX_BASE64_LEN = 4_500_000; // limite aproximado do base64 (evita travas)
+    const API_TIMEOUT_MS = 60_000;    // timeout da chamada da API
+
+    function showError(msg) {
+      erroBox.style.display = "block";
+      erroBox.textContent = msg;
+    }
+    function clearError() {
+      erroBox.style.display = "none";
+      erroBox.textContent = "";
+    }
+
+    // ✅ Converte e comprime antes de base64 (evita payload gigante)
+    async function fileToBase64Compressed(file) {
+      const img = await new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const i = new Image();
+        i.onload = () => { URL.revokeObjectURL(url); resolve(i); };
+        i.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Não consegui ler a imagem.")); };
+        i.src = url;
+      });
+
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (!w || !h) throw new Error("Imagem inválida.");
+
+      if (w > MAX_W) {
+        const ratio = MAX_W / w;
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext("2d", { willReadFrequently: false });
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // ✅ padroniza JPEG (leve e consistente com a API)
+      const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+
+      return {
+        base64: dataUrl.split(",")[1],
+        mimeType: "image/jpeg"
+      };
+    }
+
+    async function gerar() {
+      clearError();
+      resultado.innerHTML = "";
+
+      const file = document.getElementById("image").files[0];
+      const style = document.getElementById("style").value;
+      const prompt = (document.getElementById("prompt").value || "").trim();
+
+      if (!file) {
+        showError("Envie uma imagem primeiro.");
+        return;
+      }
+
+      // ✅ Limite do arquivo original
+      const mb = file.size / (1024 * 1024);
+      if (mb > MAX_FILE_MB) {
+        showError(`Arquivo muito grande (${mb.toFixed(2)}MB). Use até ${MAX_FILE_MB}MB.`);
+        return;
+      }
+
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = "Gerando...";
+      loader.style.display = "block";
+
+      try {
+        const { base64: imageBase64, mimeType } = await fileToBase64Compressed(file);
+
+        // ✅ trava por segurança (mesmo após compressão)
+        if (imageBase64.length > MAX_BASE64_LEN) {
+          throw new Error("Imagem ainda ficou pesada após compressão. Tente uma foto mais próxima/menor.");
+        }
+
+        // ✅ timeout na requisição
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            imageBase64,
+            mimeType,
+            style,
+            prompt
+          })
+        });
+
+        clearTimeout(t);
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.imageBase64) {
+          const msg = data?.error ? String(data.error) : `Erro ao gerar imagem (status ${res.status})`;
+          throw new Error(msg);
+        }
+
+        const img = document.createElement("img");
+        img.src = "data:image/png;base64," + data.imageBase64;
+        resultado.appendChild(img);
+
+      } catch (err) {
+        const isTimeout = err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort"));
+        showError("Erro: " + (isTimeout ? "Tempo excedido na geração. Tente novamente." : (err?.message || String(err))));
+      } finally {
+        loader.style.display = "none";
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    }
+
+    btn.addEventListener("click", gerar);
+  </script>
+
+</body>
+</html>
