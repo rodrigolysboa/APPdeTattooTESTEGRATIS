@@ -15,26 +15,46 @@
     #loader { display:none; margin:12px auto 0; max-width:420px; font-size:14px; opacity:.9; }
     #erro { display:none; margin:12px auto 0; max-width:420px; background:rgba(255,0,85,.15);
       border:1px solid rgba(255,0,85,.4); padding:10px; border-radius:10px; text-align:left; font-size:14px; white-space:pre-wrap; }
-    #limitBox { display:none; margin:14px auto 0; max-width:420px; background:rgba(0,200,120,.12);
-      border:1px solid rgba(0,200,120,.35); padding:12px; border-radius:12px; text-align:left; }
-    #limitBox a { color:#7CFFB7; font-weight:bold; text-decoration:underline; }
     img { max-width:420px; width:100%; margin-top:18px; border-radius:12px; background:#fff; }
     .hint { max-width:420px; margin:6px auto 0; font-size:12px; opacity:.75; }
+
+    /* Caixa limite */
+    #limitBox{
+      display:none; margin:14px auto 0; max-width:420px;
+      background:rgba(0,200,120,.12);
+      border:1px solid rgba(0,200,120,.35);
+      padding:12px; border-radius:12px; text-align:left;
+    }
+    #limitBox a{ color:#7CFFB7; font-weight:bold; text-decoration:underline; }
+    #limitImg{
+      display:none;
+      width:100%;
+      border-radius:12px;
+      margin:10px 0 12px;
+      cursor:pointer;
+    }
+    .btn-upgrade{
+      display:block;
+      width:100%;
+      max-width:420px;
+      margin:10px auto 0;
+      padding:12px;
+      border-radius:10px;
+      background:#25D366;
+      color:#0b1a12;
+      font-weight:900;
+      text-align:center;
+      text-decoration:none;
+    }
   </style>
 </head>
 <body>
 
   <h1>Teste Grátis — 15 Gerações</h1>
-  <div class="hint">Para liberar o teste, informe um WhatsApp válido.</div>
+  <div class="hint">Para liberar o teste, informe um telefone válido (WhatsApp).</div>
 
-  <input
-    type="tel"
-    id="phone"
-    placeholder="(11) 99999-9999"
-    autocomplete="tel"
-    inputmode="numeric"
-  />
-  <div class="hint">Vamos usar apenas pra liberar o teste e avisar sobre o plano completo.</div>
+  <input type="tel" id="phone" placeholder="(11) 99999-9999" autocomplete="tel" inputmode="numeric" />
+  <div class="hint">O sistema valida como Brasil (DDD + número).</div>
 
   <input type="file" id="image" accept="image/*" />
 
@@ -51,24 +71,41 @@
   <div id="loader">⏳ Gerando... (não feche a página)</div>
   <div id="erro"></div>
 
-  <div id="limitBox"></div>
+  <div id="limitBox">
+    <img id="limitImg" src="https://m.10masters.com/images/lettering-tattoo.max-1000x1000.format-webp.webp" alt="Plano completo">
+    <div id="limitText"></div>
+    <a class="btn-upgrade" id="upgradeBtn" href="https://pay.cakto.com.br/32buk26_725522" target="_blank" rel="noopener">
+      ✅ Desbloquear plano completo (R$49,90)
+    </a>
+  </div>
+
   <div id="resultado"></div>
 
   <script>
     const btn = document.getElementById("btnGerar");
     const loader = document.getElementById("loader");
     const erroBox = document.getElementById("erro");
-    const limitBox = document.getElementById("limitBox");
     const resultado = document.getElementById("resultado");
-    const phoneInput = document.getElementById("phone");
 
+    const limitBox = document.getElementById("limitBox");
+    const limitText = document.getElementById("limitText");
+    const limitImg = document.getElementById("limitImg");
+    const upgradeBtn = document.getElementById("upgradeBtn");
+
+    // ✅ Config
     const MAX_FILE_MB = 6;
     const MAX_W = 1200;
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ LINK CORRETO DO PLANO
+    // ✅ Checkout
     const UPGRADE_URL = "https://pay.cakto.com.br/32buk26_725522";
+
+    // ✅ Endpoint (como está no mesmo projeto Vercel, use relativo)
+    const API_URL = "/api/generate";
+
+    upgradeBtn.href = UPGRADE_URL;
+    limitImg.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
 
     function showError(msg) {
       erroBox.style.display = "block";
@@ -78,17 +115,21 @@
       erroBox.style.display = "none";
       erroBox.textContent = "";
     }
-
-    function showLimit(html) {
+    function showLimit(used, limit) {
       limitBox.style.display = "block";
-      limitBox.innerHTML = html;
+      limitImg.style.display = "block";
+      limitText.innerHTML =
+        `<b>LIMITE ATINGIDO.</b><br><br>` +
+        `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
+        `Clique abaixo para adquirir o plano completo de geração ilimitada por apenas <b>R$49,90</b>.`;
     }
     function hideLimit() {
       limitBox.style.display = "none";
-      limitBox.innerHTML = "";
+      limitText.innerHTML = "";
+      limitImg.style.display = "none";
     }
 
-    // ✅ Máscara BR (DDD + 9 dígitos)
+    // ✅ Máscara BR simples
     function maskPhoneBR(value){
       const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
       if (digits.length <= 2) return digits ? `(${digits}` : "";
@@ -96,17 +137,17 @@
       if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
       return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
     }
-    phoneInput.addEventListener("input", () => {
-      const caretAtEnd = phoneInput.selectionStart === phoneInput.value.length;
-      phoneInput.value = maskPhoneBR(phoneInput.value);
-      if (caretAtEnd) phoneInput.selectionStart = phoneInput.selectionEnd = phoneInput.value.length;
+    document.getElementById("phone").addEventListener("input", (e) => {
+      const el = e.target;
+      const atEnd = el.selectionStart === el.value.length;
+      el.value = maskPhoneBR(el.value);
+      if (atEnd) el.selectionStart = el.selectionEnd = el.value.length;
     });
 
+    // ✅ Normaliza para 55 + DDD + número
     function normalizePhoneToE164BR(masked){
       const digits = String(masked || "").replace(/\D/g, "");
-      // aceita: 10/11 dígitos (DDD+num) -> vira 55...
       if (digits.length === 10 || digits.length === 11) return "55" + digits;
-      // aceita: 55 + DDD + num
       if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return digits;
       return null;
     }
@@ -156,7 +197,7 @@
       hideLimit();
       resultado.innerHTML = "";
 
-      const phone = normalizePhoneToE164BR(phoneInput.value);
+      const phone = normalizePhoneToE164BR(document.getElementById("phone").value);
       if (!phone) {
         showError("Informe um WhatsApp válido. Ex: (11) 99999-9999");
         return;
@@ -189,8 +230,7 @@
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-        // ✅ CHAMA A API DO PRÓPRIO PROJETO
-        const res = await fetch("/api/generate", {
+        const res = await fetch(API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -204,26 +244,8 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
-        // ✅ LIMITE 15
-        if (res.status === 429 && data?.code === "TRIAL_LIMIT") {
-          showLimit(
-            `<b>LIMITE ATINGIDO.</b><br><br>
-             Você usou <b>${data.used ?? 15}/${data.limit ?? 15}</b> testes grátis.<br>
-             Clique abaixo para adquirir o plano completo (ilimitado) por <b>R$49,90</b>.<br><br>
-             <a href="${UPGRADE_URL}" target="_blank" rel="noopener">✅ Quero o plano completo</a>`
-          );
-          return;
-        }
-
-        // ✅ LIMITE 40/H
-        if (res.status === 429 && data?.code === "HOURLY_LIMIT") {
-          showError("Limite por hora atingido. Tente novamente mais tarde.");
-          return;
-        }
-
-        // ✅ LIMITE 3 DEVICES
-        if (res.status === 403 && data?.code === "DEVICE_LIMIT") {
-          showError("Limite de dispositivos atingido para este telefone.");
+        if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT")) {
+          showLimit(data.used ?? (data.limit ?? 15), data.limit ?? 15);
           return;
         }
 
@@ -233,12 +255,9 @@
 
         const img = document.createElement("img");
         img.src = "data:image/png;base64," + data.imageBase64;
-
-        // clicar na imagem abre plano
         img.style.cursor = "pointer";
         img.title = "Clique para adquirir o plano completo";
         img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
-
         resultado.appendChild(img);
 
       } catch (err) {
