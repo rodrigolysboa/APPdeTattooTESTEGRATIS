@@ -33,12 +33,21 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Missing or invalid device id" });
     }
 
-    const TRIAL_LIMIT = 5;
-    const MAX_DEVICES = 3;
+    // =========================
+    // LIMITES DO TESTE
+    // =========================
+    const TRIAL_LIMIT = 7;           // 7 gerações
+    const WINDOW_HOURS = 25;         // a cada 25h libera mais 7
+    const WINDOW_TTL = WINDOW_HOURS * 60 * 60; // em segundos
+    const MAX_DEVICES = 3;           // mantém seu limite de devices
 
-    const usedKey = `trial:used:${phone}`;
+    // Keys
     const devicesKey = `trial:devicesjson:${phone}`;
     const leadKey = `lead:${phone}`;
+
+    // Janela de teste (server-side KV) — evita bypass por refresh/anônimo
+    const winUsedKey = `trialwin:used:${phone}`;   // contador dentro da janela
+    const winStartKey = `trialwin:start:${phone}`; // apenas registro (opcional)
 
     // =========================
     // CONTROLE DE DEVICES (JSON) — max 3
@@ -53,10 +62,12 @@ export default async function handler(req, res) {
     const has = devices.includes(deviceId);
     if (!has) {
       if (devices.length >= MAX_DEVICES) {
+        // NÃO MOSTRAR "espera" — apenas bloqueia
         return res.status(429).json({
           error: "Device limit reached",
           code: "DEVICE_LIMIT",
-          devices: MAX_DEVICES
+          used: TRIAL_LIMIT,
+          limit: TRIAL_LIMIT
         });
       }
       devices.push(deviceId);
@@ -65,28 +76,35 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // CONTROLE: 5 testes por telefone
+    // LEAD (mantém)
     // =========================
-    const used = await kv.incr(usedKey);
-    if (used === 1) {
-      await kv.expire(usedKey, 60 * 60 * 24 * 180);
+    const leadJson = (await kv.get(leadKey)) || "{}";
+    let lead;
+    try { lead = typeof leadJson === "string" ? JSON.parse(leadJson) : (leadJson || {}); }
+    catch { lead = {}; }
 
-      // salva lead no primeiro uso
-      await kv.set(leadKey, JSON.stringify({ phone, first_seen: Date.now(), last_seen: Date.now() }));
-      await kv.expire(leadKey, 60 * 60 * 24 * 365);
-    } else {
-      // atualiza last_seen
-      const leadJson = (await kv.get(leadKey)) || "{}";
-      let lead;
-      try { lead = typeof leadJson === "string" ? JSON.parse(leadJson) : (leadJson || {}); }
-      catch { lead = {}; }
-      lead.phone = phone;
-      lead.last_seen = Date.now();
-      await kv.set(leadKey, JSON.stringify(lead));
-      await kv.expire(leadKey, 60 * 60 * 24 * 365);
+    if (!lead.first_seen) lead.first_seen = Date.now();
+    lead.phone = phone;
+    lead.last_seen = Date.now();
+
+    await kv.set(leadKey, JSON.stringify(lead));
+    await kv.expire(leadKey, 60 * 60 * 24 * 365);
+
+    // =========================
+    // CONTROLE: 7 por 25h (janela com TTL)
+    // =========================
+    // incr cria automaticamente se não existir
+    const usedInWindow = await kv.incr(winUsedKey);
+
+    if (usedInWindow === 1) {
+      // primeira chamada da janela -> define TTL da janela
+      await kv.expire(winUsedKey, WINDOW_TTL);
+      await kv.set(winStartKey, String(Date.now()));
+      await kv.expire(winStartKey, WINDOW_TTL);
     }
 
-    if (used > TRIAL_LIMIT) {
+    // passou do limite -> bloqueia (sem revelar tempo)
+    if (usedInWindow > TRIAL_LIMIT) {
       return res.status(429).json({
         error: "Trial limit reached",
         code: "TRIAL_LIMIT",
@@ -202,7 +220,7 @@ Transformar a tatuagem da foto no MESMO desenho, corrigindo apenas deformação 
 
     return res.status(200).json({
       imageBase64: inline,
-      trial: { used, limit: TRIAL_LIMIT }
+      trial: { used: usedInWindow, limit: TRIAL_LIMIT }
     });
   } catch (err) {
     const msg = err?.name === "AbortError" ? "Timeout generating image" : (err?.message || "Unexpected error");
