@@ -50,7 +50,7 @@
 </head>
 <body>
 
-  <h1>Teste Grátis — 15 Gerações</h1>
+  <h1>Teste Grátis — 5 Gerações</h1>
   <div class="hint">Para liberar o teste, informe um telefone válido (WhatsApp).</div>
 
   <input type="tel" id="phone" placeholder="(11) 99999-9999" autocomplete="tel" inputmode="numeric" />
@@ -74,8 +74,8 @@
   <div id="limitBox">
     <img id="limitImg" src="https://m.10masters.com/images/lettering-tattoo.max-1000x1000.format-webp.webp" alt="Plano completo">
     <div id="limitText"></div>
-    <a class="btn-upgrade" id="upgradeBtn" href="https://pay.cakto.com.br/32buk26_725522" target="_blank" rel="noopener">
-      ✅ Desbloquear plano completo (R$49,90)
+    <a class="btn-upgrade" id="upgradeBtn" href="https://orientetattooapp.ebookstoredigital.com.br/pageoriente/" target="_blank" rel="noopener">
+      ✅ Ver planos e liberar acesso
     </a>
   </div>
 
@@ -98,8 +98,8 @@
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ Checkout
-    const UPGRADE_URL = "https://pay.cakto.com.br/32buk26_725522";
+    // ✅ Página de planos / upgrade
+    const UPGRADE_URL = "https://orientetattooapp.ebookstoredigital.com.br/pageoriente/";
 
     // ✅ Endpoint (como está no mesmo projeto Vercel, use relativo)
     const API_URL = "/api/generate";
@@ -121,7 +121,7 @@
       limitText.innerHTML =
         `<b>LIMITE ATINGIDO.</b><br><br>` +
         `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
-        `Clique abaixo para adquirir o plano completo de geração ilimitada por apenas <b>R$49,90</b>.`;
+        `Clique abaixo para ver os planos e liberar o acesso completo.`;
     }
     function hideLimit() {
       limitBox.style.display = "none";
@@ -244,8 +244,8 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
-        if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT")) {
-          showLimit(data.used ?? (data.limit ?? 15), data.limit ?? 15);
+        if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT" || data?.code === "DEVICE_LIMIT")) {
+          showLimit(data.used ?? (data.limit ?? 5), data.limit ?? 5);
           return;
         }
 
@@ -256,7 +256,7 @@
         const img = document.createElement("img");
         img.src = "data:image/png;base64," + data.imageBase64;
         img.style.cursor = "pointer";
-        img.title = "Clique para adquirir o plano completo";
+        img.title = "Clique para ver os planos";
         img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
         resultado.appendChild(img);
 
