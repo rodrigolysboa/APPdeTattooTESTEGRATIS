@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Missing or invalid device id" });
     }
 
-    const TRIAL_LIMIT = 15;
+    const TRIAL_LIMIT = 5;
     const MAX_DEVICES = 3;
 
     const usedKey = `trial:used:${phone}`;
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // CONTROLE: 15 testes por telefone
+    // CONTROLE: 5 testes por telefone
     // =========================
     const used = await kv.incr(usedKey);
     if (used === 1) {
