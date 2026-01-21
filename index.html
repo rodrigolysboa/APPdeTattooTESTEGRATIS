@@ -50,12 +50,9 @@
 </head>
 <body>
 
-  <h1>Teste Grátis — 5 Gerações</h1>
-  <div class="hint">Para liberar o teste, informe um telefone válido (WhatsApp).</div>
+  <h1>Teste Grátis — 7 Gerações</h1>
 
   <input type="tel" id="phone" placeholder="(11) 99999-9999" autocomplete="tel" inputmode="numeric" />
-  <div class="hint">O sistema valida como Brasil (DDD + número).</div>
-
   <input type="file" id="image" accept="image/*" />
 
   <select id="style">
@@ -72,10 +69,10 @@
   <div id="erro"></div>
 
   <div id="limitBox">
-    <img id="limitImg" src="https://m.10masters.com/images/lettering-tattoo.max-1000x1000.format-webp.webp" alt="Plano completo">
+    <img id="limitImg" src="https://orientetattooapp.ebookstoredigital.com.br/wp-content/uploads/2026/01/Checklist-de-Habitos-que-Pioram-a-Coluna-1510-x-850-px-11.png" alt="Plano completo">
     <div id="limitText"></div>
-    <a class="btn-upgrade" id="upgradeBtn" href="https://orientetattooapp.ebookstoredigital.com.br/pageoriente/" target="_blank" rel="noopener">
-      ✅ Ver planos e liberar acesso
+    <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566996390278?text=Ol%C3%A1%2C%20gostaria%20de%20adquirir%20o%20OrienteTattooApp%20e%20gerar%20meus%20decalques%20em%20segundos%2C%20qual%20o%20valor%3F" target="_blank" rel="noopener">
+      ✅ Falar no WhatsApp e liberar acesso
     </a>
   </div>
 
@@ -98,8 +95,8 @@
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ Página de planos / upgrade
-    const UPGRADE_URL = "https://orientetattooapp.ebookstoredigital.com.br/pageoriente/";
+    // ✅ WhatsApp (venda X1)
+    const UPGRADE_URL = "https://wa.me/5566996390278?text=Ol%C3%A1%2C%20gostaria%20de%20adquirir%20o%20OrienteTattooApp%20e%20gerar%20meus%20decalques%20em%20segundos%2C%20qual%20o%20valor%3F";
 
     // ✅ Endpoint (como está no mesmo projeto Vercel, use relativo)
     const API_URL = "/api/generate";
@@ -115,13 +112,15 @@
       erroBox.style.display = "none";
       erroBox.textContent = "";
     }
+
+    // ✅ Sem falar de 25h: sempre mesma mensagem de upgrade
     function showLimit(used, limit) {
       limitBox.style.display = "block";
       limitImg.style.display = "block";
       limitText.innerHTML =
         `<b>LIMITE ATINGIDO.</b><br><br>` +
         `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
-        `Clique abaixo para ver os planos e liberar o acesso completo.`;
+        `Clique abaixo para falar no WhatsApp e liberar o acesso completo.`;
     }
     function hideLimit() {
       limitBox.style.display = "none";
@@ -244,8 +243,9 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
+        // ✅ Qualquer bloqueio → mesma tela de upgrade (sem falar de 25h)
         if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT" || data?.code === "DEVICE_LIMIT")) {
-          showLimit(data.used ?? (data.limit ?? 5), data.limit ?? 5);
+          showLimit(data.used ?? (data.limit ?? 7), data.limit ?? 7);
           return;
         }
 
@@ -256,7 +256,7 @@
         const img = document.createElement("img");
         img.src = "data:image/png;base64," + data.imageBase64;
         img.style.cursor = "pointer";
-        img.title = "Clique para ver os planos";
+        img.title = "Clique para falar no WhatsApp";
         img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
         resultado.appendChild(img);
 
