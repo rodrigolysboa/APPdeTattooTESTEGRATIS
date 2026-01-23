@@ -100,10 +100,10 @@
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ WhatsApp (novo)
+    // ✅ WhatsApp
     const UPGRADE_URL = "https://wa.me/5566996390278?text=Ol%C3%A1%2C%20fiz%20o%20teste%20da%20ferramenta%20OrienteTattooApp%20e%20gostaria%20de%20adquirir%20o%20plano%20completo";
 
-    // ✅ Endpoint (como está no mesmo projeto Vercel, use relativo)
+    // ✅ Endpoint (mesmo projeto Vercel)
     const API_URL = "/api/generate";
 
     upgradeBtn.href = UPGRADE_URL;
@@ -141,6 +141,22 @@
         localStorage.setItem(key, id);
       }
       return id;
+    }
+
+    // ✅ NOVO: pega UID da conta pela URL (?uid=...)
+    function getUserId() {
+      const key = "__trial_user_id__";
+      const params = new URLSearchParams(location.search);
+      const uidFromUrl = (params.get("uid") || "").trim();
+
+      if (uidFromUrl) {
+        localStorage.setItem(key, uidFromUrl);
+        return uidFromUrl;
+      }
+
+      // fallback: se já veio uma vez, reaproveita (não resolve limpeza de cache,
+      // mas quando a URL já tiver uid, trava por conta de verdade)
+      return (localStorage.getItem(key) || "").trim();
     }
 
     async function fileToBase64Compressed(file) {
@@ -201,16 +217,22 @@
       try {
         const { base64: imageBase64, mimeType } = await fileToBase64Compressed(file);
         const deviceId = getDeviceId();
+        const userId = getUserId(); // ✅ NOVO
 
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
+        const headers = {
+          "Content-Type": "application/json",
+          "X-Device-Id": deviceId
+        };
+
+        // ✅ Se houver, manda no header (trava em qualquer dispositivo)
+        if (userId) headers["X-User-Id"] = userId;
+
         const res = await fetch(API_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": deviceId
-          },
+          headers,
           signal: controller.signal,
           body: JSON.stringify({ imageBase64, mimeType, style, prompt })
         });
@@ -218,7 +240,7 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
-        // ✅ Qualquer bloqueio → mesma tela de upgrade (sem falar de 25h)
+        // ✅ Qualquer bloqueio → mesma tela de upgrade
         if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT" || data?.code === "DEVICE_LIMIT")) {
           showLimit(data.used ?? (data.limit ?? 7), data.limit ?? 7);
           return;
