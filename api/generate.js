@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-User-Phone, X-Device-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-Device-Id");
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -18,17 +18,11 @@ export default async function handler(req, res) {
 
   try {
     // =========================
-    // IDENTIFICA (Telefone + Device)
+    // IDENTIFICA (APENAS Device)
     // =========================
-    const phoneRaw = req.headers["x-user-phone"];
     const deviceRaw = req.headers["x-device-id"];
-
-    const phone = typeof phoneRaw === "string" ? phoneRaw.replace(/\D/g, "") : "";
     const deviceId = typeof deviceRaw === "string" ? deviceRaw.trim() : "";
 
-    if (!(phone.startsWith("55") && phone.length >= 12 && phone.length <= 13)) {
-      return res.status(401).json({ error: "Missing or invalid phone" });
-    }
     if (!deviceId || deviceId.length < 8) {
       return res.status(401).json({ error: "Missing or invalid device id" });
     }
@@ -39,41 +33,11 @@ export default async function handler(req, res) {
     const TRIAL_LIMIT = 7;           // 7 gerações
     const WINDOW_HOURS = 25;         // a cada 25h libera mais 7
     const WINDOW_TTL = WINDOW_HOURS * 60 * 60; // em segundos
-    const MAX_DEVICES = 3;           // mantém seu limite de devices
 
-    // Keys
-    const devicesKey = `trial:devicesjson:${phone}`;
-    const leadKey = `lead:${phone}`;
-
-    // Janela de teste (server-side KV) — evita bypass por refresh/anônimo
-    const winUsedKey = `trialwin:used:${phone}`;   // contador dentro da janela
-    const winStartKey = `trialwin:start:${phone}`; // apenas registro (opcional)
-
-    // =========================
-    // CONTROLE DE DEVICES (JSON) — max 3
-    // =========================
-    const devicesJson = (await kv.get(devicesKey)) || "[]";
-    let devices;
-    try { devices = Array.isArray(devicesJson) ? devicesJson : JSON.parse(devicesJson); }
-    catch { devices = []; }
-
-    if (!Array.isArray(devices)) devices = [];
-
-    const has = devices.includes(deviceId);
-    if (!has) {
-      if (devices.length >= MAX_DEVICES) {
-        // NÃO MOSTRAR "espera" — apenas bloqueia
-        return res.status(429).json({
-          error: "Device limit reached",
-          code: "DEVICE_LIMIT",
-          used: TRIAL_LIMIT,
-          limit: TRIAL_LIMIT
-        });
-      }
-      devices.push(deviceId);
-      await kv.set(devicesKey, JSON.stringify(devices));
-      await kv.expire(devicesKey, 60 * 60 * 24 * 180); // 180 dias
-    }
+    // Keys (por device)
+    const leadKey = `lead:device:${deviceId}`;
+    const winUsedKey = `trialwin:used:device:${deviceId}`;
+    const winStartKey = `trialwin:start:device:${deviceId}`;
 
     // =========================
     // LEAD (mantém)
@@ -84,7 +48,7 @@ export default async function handler(req, res) {
     catch { lead = {}; }
 
     if (!lead.first_seen) lead.first_seen = Date.now();
-    lead.phone = phone;
+    lead.deviceId = deviceId;
     lead.last_seen = Date.now();
 
     await kv.set(leadKey, JSON.stringify(lead));
@@ -93,17 +57,14 @@ export default async function handler(req, res) {
     // =========================
     // CONTROLE: 7 por 25h (janela com TTL)
     // =========================
-    // incr cria automaticamente se não existir
     const usedInWindow = await kv.incr(winUsedKey);
 
     if (usedInWindow === 1) {
-      // primeira chamada da janela -> define TTL da janela
       await kv.expire(winUsedKey, WINDOW_TTL);
       await kv.set(winStartKey, String(Date.now()));
       await kv.expire(winStartKey, WINDOW_TTL);
     }
 
-    // passou do limite -> bloqueia (sem revelar tempo)
     if (usedInWindow > TRIAL_LIMIT) {
       return res.status(429).json({
         error: "Trial limit reached",
