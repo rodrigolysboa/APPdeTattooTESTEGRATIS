@@ -32,6 +32,7 @@
       border-radius:12px;
       margin:10px 0 12px;
       cursor:pointer;
+      background: transparent;
     }
     .btn-upgrade{
       display:block;
@@ -52,7 +53,7 @@
 
   <h1>Teste Grátis — 7 Gerações</h1>
 
-  <input type="tel" id="phone" placeholder="(11) 99999-9999" autocomplete="tel" inputmode="numeric" />
+  <!-- REMOVIDO: campo de WhatsApp -->
   <input type="file" id="image" accept="image/*" />
 
   <select id="style">
@@ -69,9 +70,13 @@
   <div id="erro"></div>
 
   <div id="limitBox">
-    <img id="limitImg" src="https://orientetattooapp.ebookstoredigital.com.br/wp-content/uploads/2026/01/Checklist-de-Habitos-que-Pioram-a-Coluna-1510-x-850-px-11.png" alt="Plano completo">
+    <img
+      id="limitImg"
+      src="https://teste.orientetattoo.app/wp-content/uploads/2026/01/cropped-Copia-de-OrienteTattoo.App-8.png"
+      alt="Plano completo"
+    >
     <div id="limitText"></div>
-    <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566996390278?text=Ol%C3%A1%2C%20gostaria%20de%20adquirir%20o%20OrienteTattooApp%20e%20gerar%20meus%20decalques%20em%20segundos%2C%20qual%20o%20valor%3F" target="_blank" rel="noopener">
+    <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566996390278?text=Ol%C3%A1%2C%20fiz%20o%20teste%20da%20ferramenta%20OrienteTattooApp%20e%20gostaria%20de%20adquirir%20o%20plano%20completo" target="_blank" rel="noopener">
       ✅ Falar no WhatsApp e liberar acesso
     </a>
   </div>
@@ -95,8 +100,8 @@
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ WhatsApp (venda X1)
-    const UPGRADE_URL = "https://wa.me/5566996390278?text=Ol%C3%A1%2C%20gostaria%20de%20adquirir%20o%20OrienteTattooApp%20e%20gerar%20meus%20decalques%20em%20segundos%2C%20qual%20o%20valor%3F";
+    // ✅ WhatsApp (novo)
+    const UPGRADE_URL = "https://wa.me/5566996390278?text=Ol%C3%A1%2C%20fiz%20o%20teste%20da%20ferramenta%20OrienteTattooApp%20e%20gostaria%20de%20adquirir%20o%20plano%20completo";
 
     // ✅ Endpoint (como está no mesmo projeto Vercel, use relativo)
     const API_URL = "/api/generate";
@@ -126,29 +131,6 @@
       limitBox.style.display = "none";
       limitText.innerHTML = "";
       limitImg.style.display = "none";
-    }
-
-    // ✅ Máscara BR simples
-    function maskPhoneBR(value){
-      const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
-      if (digits.length <= 2) return digits ? `(${digits}` : "";
-      if (digits.length <= 6) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
-      if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
-      return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
-    }
-    document.getElementById("phone").addEventListener("input", (e) => {
-      const el = e.target;
-      const atEnd = el.selectionStart === el.value.length;
-      el.value = maskPhoneBR(el.value);
-      if (atEnd) el.selectionStart = el.selectionEnd = el.value.length;
-    });
-
-    // ✅ Normaliza para 55 + DDD + número
-    function normalizePhoneToE164BR(masked){
-      const digits = String(masked || "").replace(/\D/g, "");
-      if (digits.length === 10 || digits.length === 11) return "55" + digits;
-      if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return digits;
-      return null;
     }
 
     function getDeviceId() {
@@ -196,12 +178,6 @@
       hideLimit();
       resultado.innerHTML = "";
 
-      const phone = normalizePhoneToE164BR(document.getElementById("phone").value);
-      if (!phone) {
-        showError("Informe um WhatsApp válido. Ex: (11) 99999-9999");
-        return;
-      }
-
       const file = document.getElementById("image").files[0];
       const style = document.getElementById("style").value;
       const prompt = (document.getElementById("prompt").value || "").trim();
@@ -233,7 +209,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-User-Phone": phone,
             "X-Device-Id": deviceId
           },
           signal: controller.signal,
