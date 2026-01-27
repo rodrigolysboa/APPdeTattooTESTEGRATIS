@@ -137,18 +137,37 @@ export default async function handler(req, res) {
 
     const prompts = {
       line: `
-OBJETIVO (MODO LINE / DECALQUE DE LINHAS):
-Você receberá uma FOTO de uma tatuagem aplicada na PELE.
-Sua tarefa é IDENTIFICAR e RECRIAR a MESMA ARTE como LINE ART em uma FOLHA A4 BRANCA, vista de cima.
+OBJETIVO (MODO LINE / EXTRAÇÃO DE LINHAS PURAS):
 
-REGRAS:
-- APENAS linhas pretas (sem sombras, sem cinza, sem textura, sem pele).
-- Corrigir perspectiva/curvatura e deixar plano em papel.
-- Completar partes faltantes SEM inventar elementos novos.
-- Se houver texto/lettering, reescrever fielmente.
+Você receberá a imagem de uma tatuagem aplicada na pele humana.
+Sua tarefa é extrair e reconstruir EXCLUSIVAMENTE os TRAÇOS ORIGINAIS do desenho, convertendo-os em LINE ART puro, preciso e alinhado.
 
-SAÍDA:
-- Fundo branco puro, estilo folha A4, sem objetos, sem UI.
+PRINCÍPIO CENTRAL:
+- Considere apenas os contornos reais do desenho.
+- Ignore completamente a pele, sombras, cores, preenchimentos, texturas, luz, reflexos e qualquer efeito visual.
+- O resultado deve ser um desenho técnico de linhas finas, pronto para decalque profissional.
+
+REGRAS ABSOLUTAS (OBRIGATÓRIAS):
+1. Usar SOMENTE linhas pretas finas (#000000).
+2. Proibir qualquer sombra, cinza, degradê, pintura, preenchimento, pontilhismo, hachura ou espessamento de linha.
+3. Não estilizar, não embelezar e não reinterpretar o desenho.
+4. Não adicionar elementos inexistentes na tatuagem original.
+5. Corrigir completamente distorções de perspectiva e curvatura do corpo, deixando o desenho plano, simétrico e alinhado.
+6. Alinhar rigorosamente todas as linhas, principalmente em textos, letras e números.
+7. Se houver lettering, corrigir inclinações, irregularidades e deformações, mantendo o estilo original.
+8. Reconstruir partes ocultas apenas quando necessário, sem alterar o traço original.
+9. Não preencher áreas internas: apenas contornos e linhas estruturais.
+
+SAÍDA VISUAL:
+- Fundo totalmente branco (#FFFFFF), uniforme, sem textura e sem aparência de papel.
+- Nenhum objeto, sombra, moldura, interface ou elemento extra.
+- Apenas o desenho em linhas pretas finas sobre o fundo branco.
+
+RESULTADO FINAL:
+- Decalque em line art puro, limpo, preciso e técnico.
+- Aparência de desenho vetorial e stencil profissional.
+- Linhas finas, contínuas, bem definidas e perfeitamente alinhadas.
+- Nenhum elemento além das linhas do desenho.
 `,
       shadow: `
 OBJETIVO (MODO SHADOW / LINHAS + SOMBRA LEVE):
