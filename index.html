@@ -76,7 +76,7 @@
       alt="Plano completo"
     >
     <div id="limitText"></div>
-    <a class="btn-upgrade" id="upgradeBtn" href="https://orientetattoo.app/checkout/?add-to-cart=16586" target="_blank" rel="noopener">
+    <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566999191380?text=Ol%C3%A1%2C%20fiz%20o%20teste%20gratis%20e%20gostaria%20de%20adquirir%20o%20PLANO%20COMPLETO" target="_blank" rel="noopener">
       ✅ Adquirir e liberar acesso
     </a>
   </div>
@@ -101,7 +101,7 @@
     const API_TIMEOUT_MS = 60000;
 
     // ✅ WhatsApp
-    const UPGRADE_URL = "https://orientetattoo.app/checkout/?add-to-cart=16586";
+    const UPGRADE_URL = "https://wa.me/5566999191380?text=Ol%C3%A1%2C%20fiz%20o%20teste%20gratis%20e%20gostaria%20de%20adquirir%20o%20PLANO%20COMPLETO";
 
     // ✅ Endpoint (mesmo projeto Vercel)
     const API_URL = "/api/generate";
@@ -123,9 +123,11 @@
       limitBox.style.display = "block";
       limitImg.style.display = "block";
       limitText.innerHTML =
-        `<b>LIMITE ATINGIDO.</b><br><br>` +
-        `Você usou <b>${used}/${limit}</b> testes grátis.<br>` +
-        `Clique abaixo preencha seus dados e libere o acesso completo.`;
+  `<b>LIMITE ATINGIDO.</b><br><br>` +
+  `Você usou <b>${used}/${limit}</b> testes grátis.<br><br>` +
+  `Curtiu o resultado? ✅<br>` +
+  `No plano completo você libera <b>uso ilimitado</b> e consegue gerar seus decalques sempre que precisar.<br>` +
+  `Clique abaixo e fale com a gente no WhatsApp.`;
     }
     function hideLimit() {
       limitBox.style.display = "none";
