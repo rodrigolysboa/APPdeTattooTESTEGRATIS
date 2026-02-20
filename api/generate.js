@@ -170,13 +170,57 @@ RESULTADO FINAL:
 - Nenhum elemento além das linhas do desenho.
 `,
       shadow: `
-OBJETIVO (MODO SHADOW / LINHAS + SOMBRA LEVE):
-Transformar foto de tattoo em desenho em folha A4 branca.
-- Prioridade máxima: linhas.
-- Permitir sombra LEVE e CONTROLADA, sem textura de pele.
-- Completar partes faltantes sem inventar.
-- Lettering fiel se existir.
-- Folha A4 branca vista de cima, mesa de madeira clara discreta.
+OBJETIVO (MODO SHADOW – ESTÊNCIL TÉCNICO PROFISSIONAL)
+Converta uma imagem hiper-realista em um contorno profissional de estêncil para tatuagem.
+Preserve exatamente a anatomia, proporções, expressão facial, microdetalhes e textura da imagem original. Nenhuma estrutura deve ser simplificada ou perdida.
+Use linhas de contorno precisas, técnicas e refinadas para definir a estrutura principal. Permita variações sutis na espessura das linhas para sugerir profundidade e hierarquia visual.
+
+CAPTURA DE DETALHES:
+
+Extraia e traduza todos os mínimos detalhes da imagem:
+• textura da pele
+• fios individuais de cabelo
+• pelos da barba
+• marcas, cicatrizes, rugas
+• relevos de armadura, tecidos e ornamentos
+
+Não omita microinformações importantes.
+Não simplifique excessivamente áreas complexas.
+
+MARCAÇÃO DE SOMBRA (ESTILO TÉCNICO PROFISSIONAL):
+Delimite claramente todas as transições de luz e sombra.
+Utilize linhas auxiliares estruturais para indicar volumes.
+Marque as separações de áreas de sombra com tracejado MUITO DISCRETO.
+Os tracejados devem ser pequenos, somente onde apareça separações de tons.
+Nunca use vermelho.
+Nunca use cinza.
+Nunca use preenchimento sólido para indicar sombra.
+Os tracejados devem ser mínimos, somente como complemento.
+
+ESPAÇOS NEGATIVOS:
+Preserve totalmente os espaços brancos e áreas de highlight.
+Não preencha áreas de luz.
+Não desenhe dentro das áreas de brilho.
+O branco deve permanecer completamente limpo.
+
+FUNDO:
+Contorne apenas elementos essenciais que interagem com o sujeito.
+Simplifique o fundo em formas técnicas legíveis.
+Remova completamente qualquer poluição visual irrelevante.
+
+RESULTADO FINAL:
+
+O resultado deve parecer um estêncil técnico profissional avançado de estúdio de tatuagem:
+
+• Contornos estruturais precisos
+• Microdetalhes preservados
+• Pontilhado preto técnico indicando sombra
+• Áreas brancas limpas e abertas
+• Leitura clara, marcante e pronta para transferência
+
+A imagem final deve estar sobre fundo totalmente branco (#FFFFFF), limpa e pronta para impressão.
+
+Gere somente a imagem final. Não retorne texto.
 `,
 clean: `
 OBJETIVO (MODO CLEAN – RECRIAÇÃO TOTAL DO DESENHO):
