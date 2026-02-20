@@ -47,6 +47,83 @@
       text-align:center;
       text-decoration:none;
     }
+
+    /* ===== Comparador antes/depois (ARRASTÁVEL) ===== */
+    .ot-compare-wrap{
+      width:100%;
+      max-width:420px;
+      margin:18px auto 0;
+    }
+    .ot-compare{
+      position:relative;
+      width:100%;
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+      touch-action: pan-y;
+      user-select:none;
+    }
+    .ot-compare img{
+      width:100%;
+      height:auto;
+      display:block;
+    }
+    .ot-after{
+      position:absolute;
+      inset:0;
+      width:50%;
+      overflow:hidden;
+    }
+    .ot-slider{
+      position:absolute;
+      top:0;
+      left:50%;
+      transform:translateX(-50%);
+      height:100%;
+      width:44px;
+      z-index:5;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor: ew-resize;
+    }
+    .ot-line{
+      position:absolute;
+      top:0;
+      left:50%;
+      transform:translateX(-50%);
+      width:4px;
+      height:100%;
+      background:#00ff66;
+      box-shadow:0 0 14px rgba(0,255,102,.75);
+      border-radius:999px;
+    }
+    .ot-knob{
+      position:relative;
+      background:#00ff66;
+      color:#0b1a12;
+      font-weight:900;
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:14px;
+      line-height:1;
+      box-shadow:0 0 18px rgba(0,255,102,.75);
+    }
+    .ot-label{
+      position:absolute;
+      top:10px;
+      z-index:6;
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.06em;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(0,0,0,.55);
+      color:#fff;
+      backdrop-filter: blur(6px);
+    }
+    .ot-label.before{ left:10px; }
+    .ot-label.after{ right:10px; }
   </style>
 </head>
 <body>
@@ -77,8 +154,8 @@
     >
     <div id="limitText"></div>
     <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566999191380?text=Ol%C3%A1%21%20Fiz%20o%20teste%20gr%C3%A1tis%20do%20OrienteTattooApp%20e%20quero%20liberar%20o%20plano%20completo%20%28uso%20ilimitado%29.%20Como%20fa%C3%A7o%3F" target="_blank" rel="noopener">
-  ✅ Adquirir e liberar acesso
-</a>
+      ✅ Adquirir e liberar acesso
+    </a>
   </div>
 
   <div id="resultado"></div>
@@ -123,11 +200,11 @@
       limitBox.style.display = "block";
       limitImg.style.display = "block";
       limitText.innerHTML =
-  `<b>LIMITE ATINGIDO.</b><br><br>` +
-  `Você usou <b>${used}/${limit}</b> testes grátis.<br><br>` +
-  `Curtiu o resultado? ✅<br>` +
-  `No plano completo você libera <b>uso ilimitado</b> e consegue gerar seus decalques sempre que precisar.<br>` +
-  `Clique abaixo e fale com a gente no WhatsApp.`;
+        `<b>LIMITE ATINGIDO.</b><br><br>` +
+        `Você usou <b>${used}/${limit}</b> testes grátis.<br><br>` +
+        `Curtiu o resultado? ✅<br>` +
+        `No plano completo você libera <b>uso ilimitado</b> e consegue gerar seus decalques sempre que precisar.<br>` +
+        `Clique abaixo e fale com a gente no WhatsApp.`;
     }
     function hideLimit() {
       limitBox.style.display = "none";
@@ -156,8 +233,7 @@
         return uidFromUrl;
       }
 
-      // fallback: se já veio uma vez, reaproveita (não resolve limpeza de cache,
-      // mas quando a URL já tiver uid, trava por conta de verdade)
+      // fallback: se já veio uma vez, reaproveita
       return (localStorage.getItem(key) || "").trim();
     }
 
@@ -189,6 +265,82 @@
 
       const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
       return { base64: dataUrl.split(",")[1], mimeType: "image/jpeg" };
+    }
+
+    function renderCompare(beforeSrc, afterSrc) {
+      resultado.innerHTML = `
+        <div class="ot-compare-wrap">
+          <div class="ot-compare" id="otCompare" aria-label="Comparador antes e depois">
+            <span class="ot-label before">ANTES</span>
+            <span class="ot-label after">DEPOIS</span>
+
+            <img id="beforeImg" alt="Antes">
+
+            <div class="ot-after" id="afterOverlay">
+              <img id="afterImg" alt="Depois">
+            </div>
+
+            <div class="ot-slider" id="compareSlider" aria-label="Arraste para comparar">
+              <div class="ot-line"></div>
+              <div class="ot-knob">⇆</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const container = document.getElementById("otCompare");
+      const beforeImg = document.getElementById("beforeImg");
+      const afterImg = document.getElementById("afterImg");
+      const afterOverlay = document.getElementById("afterOverlay");
+      const slider = document.getElementById("compareSlider");
+
+      beforeImg.src = beforeSrc;
+      afterImg.src = afterSrc;
+
+      function setPos(pct) {
+        const p = Math.max(0, Math.min(100, pct));
+        afterOverlay.style.width = p + "%";
+        slider.style.left = p + "%";
+      }
+      setPos(50);
+
+      // Clique no comparador abre WhatsApp (igual seu comportamento antigo de clique no resultado)
+      // (Se você quiser tirar isso depois, eu removo em 1 linha.)
+      container.title = "Arraste para comparar — clique para falar no WhatsApp";
+      container.addEventListener("click", () => window.open(UPGRADE_URL, "_blank", "noopener"));
+
+      let dragging = false;
+      const pctFromX = (clientX) => {
+        const r = container.getBoundingClientRect();
+        let x = clientX - r.left;
+        if (x < 0) x = 0;
+        if (x > r.width) x = r.width;
+        return (x / r.width) * 100;
+      };
+
+      // Desktop
+      container.addEventListener("mousedown", (e) => {
+        dragging = true;
+        setPos(pctFromX(e.clientX));
+      });
+      window.addEventListener("mouseup", () => dragging = false);
+      window.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        setPos(pctFromX(e.clientX));
+      });
+
+      // Mobile
+      container.addEventListener("touchstart", (e) => {
+        dragging = true;
+        setPos(pctFromX(e.touches[0].clientX));
+      }, { passive: true });
+
+      container.addEventListener("touchmove", (e) => {
+        if (!dragging) return;
+        setPos(pctFromX(e.touches[0].clientX));
+      }, { passive: true });
+
+      window.addEventListener("touchend", () => dragging = false);
     }
 
     async function gerar() {
@@ -252,12 +404,11 @@
           throw new Error(data?.error || `Erro ao gerar (status ${res.status})`);
         }
 
-        const img = document.createElement("img");
-        img.src = "data:image/png;base64," + data.imageBase64;
-        img.style.cursor = "pointer";
-        img.title = "Clique para falar no WhatsApp";
-        img.onclick = () => window.open(UPGRADE_URL, "_blank", "noopener");
-        resultado.appendChild(img);
+        // ===== ARRÁSTAVEL: Antes = imagem enviada, Depois = resultado =====
+        const beforeSrc = URL.createObjectURL(file);
+        const afterSrc = "data:image/png;base64," + data.imageBase64;
+
+        renderCompare(beforeSrc, afterSrc);
 
       } catch (err) {
         const isTimeout = err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort"));
