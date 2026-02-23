@@ -241,7 +241,6 @@ A imagem de referência pode estar em um braço, perna, costas ou qualquer parte
 ISSO NÃO IMPORTA.
 
 VOCÊ NUNCA DEVE:
-
 - Manter formato do membro
 - Respeitar limites da pele
 - Criar um desenho com contorno de braço ou perna
@@ -259,7 +258,6 @@ REGRAS ABSOLUTAS E OBRIGATÓRIAS:
 1. IGNORAR TOTALMENTE A PELE E A ANATOMIA:
 
 É PROIBIDO:
-
 - Manter contorno do braço, perna ou corpo
 - Preservar curvatura da pele
 - Deixar laterais com formato anatômico
@@ -276,14 +274,12 @@ Um desenho plano e independente, como se NUNCA tivesse sido tatuagem.
 2. EXPANSÃO E RECONSTRUÇÃO DAS LATERAIS:
 
 Se a tatuagem original estiver:
-
 - Cortada nas bordas
 - Parcialmente fora da foto
 - Limitada pelo formato do membro
 - Incompleta nas extremidades
 
 ENTÃO VOCÊ DEVE:
-
 - EXPANDIR o desenho para os lados
 - RECRIAR partes faltantes
 - COMPLETAR elementos interrompidos
@@ -298,7 +294,6 @@ mesmo que a foto original não mostre tudo.
 3. RECONSTRUÇÃO TOTAL DA ARTE:
 
 Você deve:
-
 - Redesenhar TODAS as partes da tatuagem
 - Reconstruir áreas borradas
 - Recriar partes escondidas por ângulo ou pele
@@ -313,7 +308,6 @@ REDESENHAR – não apenas copiar.
 4. GEOMETRIA E SIMETRIA PERFEITAS:
 
 Sempre que houver:
-
 - Círculos
 - Mandalas
 - Padrões repetitivos
@@ -321,7 +315,6 @@ Sempre que houver:
 - Elementos simétricos
 
 Você deve:
-
 → alinhar perfeitamente
 → centralizar
 → corrigir distorções
@@ -333,18 +326,21 @@ Você deve:
 5. FIDELIDADE AO ESTILO ORIGINAL:
 
 É obrigatório:
-
+- Manter ao máximo a fidelidade a tatuagem original
 - Manter exatamente o mesmo estilo artístico
 - Manter proporções reais entre elementos
 - Manter tipo de traço e estética
 - Preservar sombras e detalhes originais
 
-Você NÃO deve:
-
+É extremamente PROIBIDO:
 - Mudar estilo
 - Embelezar excessivamente
 - Simplificar demais
 - Transformar em outro tipo de arte
+- Adicionar símbolos ou elementos novos
+- Espelhar o lado tatuagem ou partes da tatuagem
+- Criar ornamentos inexistentes
+- Inserir molduras, arabescos ou enfeites não presentes
 
 Corrija APENAS o que foi deformado pela pele e pela fotografia.
 
@@ -353,7 +349,6 @@ Corrija APENAS o que foi deformado pela pele e pela fotografia.
 6. RESULTADO FINAL EXIGIDO:
 
 A saída deve ser exatamente:
-
 - Um DESENHO COMPLETO e FINALIZADO
 - Em folha A4 branca
 - Plano e frontal
@@ -370,17 +365,14 @@ A saída deve ser exatamente:
 REGRA DE OURO DEFINITIVA:
 
 A IMAGEM FINAL DEVE PARECER:
-
 “Um desenho profissional criado do zero em papel”
 
 e NUNCA:
-
 “uma tatuagem recortada do corpo”.
 
 ---
 
 Se em qualquer parte do resultado for possível perceber:
-
 - curvatura de braço
 - formato de antebraço
 - silhueta de perna
