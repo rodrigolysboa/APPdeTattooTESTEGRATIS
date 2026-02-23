@@ -437,7 +437,7 @@ Não retorne nenhum texto.
     const parts = json?.candidates?.[0]?.content?.parts || [];
     const inline = parts.find((p) => p?.inlineData?.data)?.inlineData?.data;
 
-    if (!inline) return res.status(500).json({ error: "No image returned", raw: json });
+    if (!inline) return res.status(500).json({ error: "Estamos em atualização, isso vai levar apenas uns minutos.", raw: json });
 
     return res.status(200).json({
       imageBase64: inline,
