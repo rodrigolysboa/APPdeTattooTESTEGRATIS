@@ -1,8 +1,20 @@
 import { kv } from "@vercel/kv";
 
+const ALLOWED_ORIGINS = new Set([
+  "https://testegratis.orientetattoo.app",
+  "https://www.testegratis.orientetattoo.app",
+]);
+
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // =========================
+  // CORS + NO CACHE
+  // =========================
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -11,6 +23,11 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method === "OPTIONS") return res.status(200).end();
+
+  // Bloqueia qualquer origem fora do domínio permitido
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
 
   // healthcheck
   if (req.method === "GET") {
