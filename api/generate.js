@@ -331,6 +331,9 @@ Sempre que houver:
 - Geometria
 - Elementos simétricos
 
+Círculos devem ser perfeitamente circulares,
+sem deformação causada pela pele ou perspectiva da foto.
+
 Você deve:
 → alinhar perfeitamente
 → centralizar
@@ -351,6 +354,8 @@ Sempre que houver linhas que representem:
 - cruzamentos geométricos
 
 Essas linhas DEVEM ser reconstruídas como linhas perfeitamente retas.
+Linhas que funcionam como base de texto devem ser perfeitamente retas,
+como se desenhadas com régua técnica.
 
 REGRAS OBRIGATÓRIAS:
 
@@ -395,6 +400,8 @@ Corrija APENAS o que foi deformado pela pele e pela fotografia.
 5.1 RECONSTRUÇÃO TIPOGRÁFICA OBRIGATÓRIA:
 
 Sempre que houver TEXTO na tatuagem (palavras, frases, números ou letras isoladas):
+Texto deve parecer tipografia editorial limpa,
+não lettering desenhado à mão.
 
 VOCÊ NÃO DEVE copiar o texto pixel por pixel da imagem.
 
