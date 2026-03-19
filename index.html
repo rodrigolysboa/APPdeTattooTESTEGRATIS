@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Teste Grátis — Gerador de Arte</title>
+  <title>Oriente Tattoo — Gerador de Arte</title>
   <style>
     body { font-family: Arial, sans-serif; background:#111; color:#fff; text-align:center; padding:32px; }
     input, textarea, button, select {
@@ -13,12 +13,14 @@
     button { background:#ff0055; color:#fff; cursor:pointer; font-weight:bold; }
     button:disabled { opacity:.6; cursor:not-allowed; }
     #loader { display:none; margin:12px auto 0; max-width:420px; font-size:14px; opacity:.9; }
-    #erro { display:none; margin:12px auto 0; max-width:420px; background:rgba(255,0,85,.15);
-      border:1px solid rgba(255,0,85,.4); padding:10px; border-radius:10px; text-align:left; font-size:14px; white-space:pre-wrap; }
+    #erro {
+      display:none; margin:12px auto 0; max-width:420px; background:rgba(255,0,85,.15);
+      border:1px solid rgba(255,0,85,.4); padding:10px; border-radius:10px;
+      text-align:left; font-size:14px; white-space:pre-wrap;
+    }
     img { max-width:420px; width:100%; margin-top:18px; border-radius:12px; background:#fff; }
     .hint { max-width:420px; margin:6px auto 0; font-size:12px; opacity:.75; }
 
-    /* Caixa limite */
     #limitBox{
       display:none; margin:14px auto 0; max-width:420px;
       background:rgba(0,200,120,.12);
@@ -48,7 +50,6 @@
       text-decoration:none;
     }
 
-    /* ===== Comparador antes/depois (ARRASTÁVEL) ===== */
     .ot-compare-wrap{
       width:100%;
       max-width:420px;
@@ -128,9 +129,8 @@
 </head>
 <body>
 
-  <h1>Teste Grátis — 7 Gerações</h1>
+  <h1>Gerador de Arte — 50 Gerações</h1>
 
-  <!-- REMOVIDO: campo de WhatsApp -->
   <input type="file" id="image" accept="image/*" />
 
   <select id="style">
@@ -141,7 +141,7 @@
 
   <textarea id="prompt" placeholder="(Opcional) Observações: ex: traço fino, completar parte escondida..."></textarea>
 
-  <button id="btnGerar">Gerar Arte (Teste)</button>
+  <button id="btnGerar">Gerar Arte</button>
 
   <div id="loader">⏳ Gerando... (não feche a página)</div>
   <div id="erro"></div>
@@ -150,11 +150,11 @@
     <img
       id="limitImg"
       src="https://testegratis.orientetattoo.app/wp-content/uploads/2026/01/Copia-de-OrienteTattoo.App-8-1.png"
-      alt="Plano completo"
+      alt="Aumente seu plano"
     >
     <div id="limitText"></div>
-    <a class="btn-upgrade" id="upgradeBtn" href="https://wa.me/5566999191380?text=Ol%C3%A1%21%20Fiz%20o%20teste%20gr%C3%A1tis%20do%20OrienteTattooApp%20e%20quero%20liberar%20o%20plano%20completo%20%28uso%20ilimitado%29.%20Como%20fa%C3%A7o%3F" target="_blank" rel="noopener">
-      ✅ Adquirir e liberar acesso
+    <a class="btn-upgrade" id="upgradeBtn" href="https://orientetattoo.app/sobre" target="_blank" rel="noopener">
+      ✅ Aumentar meu plano
     </a>
   </div>
 
@@ -171,16 +171,12 @@
     const limitImg = document.getElementById("limitImg");
     const upgradeBtn = document.getElementById("upgradeBtn");
 
-    // ✅ Config
     const MAX_FILE_MB = 6;
     const MAX_W = 1200;
     const JPEG_QUALITY = 0.86;
     const API_TIMEOUT_MS = 60000;
 
-    // ✅ WhatsApp
-    const UPGRADE_URL = "https://wa.me/5566999191380?text=Ol%C3%A1%21%20Fiz%20o%20teste%20gr%C3%A1tis%20do%20OrienteTattooApp%20e%20quero%20liberar%20o%20plano%20completo%20%28uso%20ilimitado%29.%20Como%20fa%C3%A7o%3F";
-
-    // ✅ Endpoint (mesmo projeto Vercel)
+    const UPGRADE_URL = "https://orientetattoo.app/sobre";
     const API_URL = "/api/generate";
 
     upgradeBtn.href = UPGRADE_URL;
@@ -190,22 +186,22 @@
       erroBox.style.display = "block";
       erroBox.textContent = msg;
     }
+
     function clearError() {
       erroBox.style.display = "none";
       erroBox.textContent = "";
     }
 
-    // ✅ Sem falar de 25h: sempre mesma mensagem de upgrade
     function showLimit(used, limit) {
       limitBox.style.display = "block";
       limitImg.style.display = "block";
       limitText.innerHTML =
         `<b>LIMITE ATINGIDO.</b><br><br>` +
-        `Você usou <b>${used}/${limit}</b> testes grátis.<br><br>` +
-        `Curtiu o resultado? ✅<br>` +
-        `No plano completo você libera <b>uso ilimitado</b> e consegue gerar seus decalques sempre que precisar.<br>` +
-        `Clique abaixo e fale com a gente no WhatsApp.`;
+        `Você usou <b>${used}/${limit}</b> imagens.<br><br>` +
+        `Aumente seu plano para continuar gerando.<br>` +
+        `Clique no botão abaixo para saber mais.`;
     }
+
     function hideLimit() {
       limitBox.style.display = "none";
       limitText.innerHTML = "";
@@ -222,7 +218,6 @@
       return id;
     }
 
-    // ✅ NOVO: pega UID da conta pela URL (?uid=...)
     function getUserId() {
       const key = "__trial_user_id__";
       const params = new URLSearchParams(location.search);
@@ -233,7 +228,6 @@
         return uidFromUrl;
       }
 
-      // fallback: se já veio uma vez, reaproveita
       return (localStorage.getItem(key) || "").trim();
     }
 
@@ -248,6 +242,7 @@
 
       let w = img.naturalWidth || img.width;
       let h = img.naturalHeight || img.height;
+
       if (!w || !h) throw new Error("Imagem inválida.");
 
       if (w > MAX_W) {
@@ -302,12 +297,8 @@
         afterOverlay.style.width = p + "%";
         slider.style.left = p + "%";
       }
-      setPos(50);
 
-      // Clique no comparador abre WhatsApp (igual seu comportamento antigo de clique no resultado)
-      // (Se você quiser tirar isso depois, eu removo em 1 linha.)
-      container.title = "Arraste para comparar — clique para falar no WhatsApp";
-      container.addEventListener("click", () => window.open(UPGRADE_URL, "_blank", "noopener"));
+      setPos(50);
 
       let dragging = false;
       const pctFromX = (clientX) => {
@@ -318,18 +309,18 @@
         return (x / r.width) * 100;
       };
 
-      // Desktop
       container.addEventListener("mousedown", (e) => {
         dragging = true;
         setPos(pctFromX(e.clientX));
       });
+
       window.addEventListener("mouseup", () => dragging = false);
+
       window.addEventListener("mousemove", (e) => {
         if (!dragging) return;
         setPos(pctFromX(e.clientX));
       });
 
-      // Mobile
       container.addEventListener("touchstart", (e) => {
         dragging = true;
         setPos(pctFromX(e.touches[0].clientX));
@@ -371,7 +362,7 @@
       try {
         const { base64: imageBase64, mimeType } = await fileToBase64Compressed(file);
         const deviceId = getDeviceId();
-        const userId = getUserId(); // ✅ NOVO
+        const userId = getUserId();
 
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -381,7 +372,6 @@
           "X-Device-Id": deviceId
         };
 
-        // ✅ Se houver, manda no header (trava em qualquer dispositivo)
         if (userId) headers["X-User-Id"] = userId;
 
         const res = await fetch(API_URL, {
@@ -394,9 +384,8 @@
         clearTimeout(t);
         const data = await res.json().catch(() => ({}));
 
-        // ✅ Qualquer bloqueio → mesma tela de upgrade
-        if (res.status === 429 && (data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT" || data?.code === "DEVICE_LIMIT")) {
-          showLimit(data.used ?? (data.limit ?? 7), data.limit ?? 7);
+        if (res.status === 429 && (data?.code === "IMAGE_LIMIT" || data?.code === "TRIAL_LIMIT" || data?.code === "HOURLY_LIMIT" || data?.code === "DEVICE_LIMIT")) {
+          showLimit(data.used ?? (data.limit ?? 50), data.limit ?? 50);
           return;
         }
 
@@ -404,7 +393,6 @@
           throw new Error(data?.error || `Erro ao gerar (status ${res.status})`);
         }
 
-        // ===== ARRÁSTAVEL: Antes = imagem enviada, Depois = resultado =====
         const beforeSrc = URL.createObjectURL(file);
         const afterSrc = "data:image/png;base64," + data.imageBase64;
 
