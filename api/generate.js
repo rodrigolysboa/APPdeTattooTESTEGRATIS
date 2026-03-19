@@ -3,12 +3,11 @@ import { kv } from "@vercel/kv";
 const ALLOWED_ORIGINS = new Set([
   "https://testegratis.orientetattoo.app",
   "https://www.testegratis.orientetattoo.app",
+  "https://orientetattoo.app",
+  "https://www.orientetattoo.app",
 ]);
 
 export default async function handler(req, res) {
-  // =========================
-  // CORS + NO CACHE
-  // =========================
   const origin = req.headers.origin;
 
   if (origin && ALLOWED_ORIGINS.has(origin)) {
@@ -24,29 +23,25 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // Bloqueia qualquer origem fora do domínio permitido
   if (!origin || !ALLOWED_ORIGINS.has(origin)) {
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
-  // healthcheck
   if (req.method === "GET") {
-    return res
-      .status(200)
-      .json({ ok: true, message: "API online. Use POST em /api/generate" });
+    return res.status(200).json({
+      ok: true,
+      message: "API online. Use POST em /api/generate",
+    });
   }
 
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
-    // =========================
-    // IDENTIFICA (UserId opcional + Device obrigatório)
-    // =========================
     const deviceRaw = req.headers["x-device-id"];
     const deviceId = typeof deviceRaw === "string" ? deviceRaw.trim() : "";
 
-    // ✅ NOVO: conta (para travar em todos os dispositivos)
     const userRaw = req.headers["x-user-id"];
     const userId =
       typeof userRaw === "string" ? userRaw.trim().slice(0, 128) : "";
@@ -56,35 +51,25 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // LIMITES DO TESTE
+    // NOVA REGRA
     // =========================
-    const TRIAL_LIMIT = 7; // 7 gerações
-    const WINDOW_HOURS = 25; // a cada 25h libera mais 7
-    const WINDOW_TTL = WINDOW_HOURS * 60 * 60; // em segundos
+    const IMAGE_LIMIT = 50;
+    const WINDOW_DAYS = 20;
+    const WINDOW_TTL = WINDOW_DAYS * 24 * 60 * 60; // segundos
 
-    // =========================
-    // SELETOR DE CHAVE (por conta quando existir; senão por device)
-    // =========================
     const scopeType = userId ? "user" : "device";
     const scopeId = userId || deviceId;
 
-    // Keys (por user OU por device)
     const leadKey = `lead:${scopeType}:${scopeId}`;
-    const winUsedKey = `trialwin:used:${scopeType}:${scopeId}`;
-    const winStartKey = `trialwin:start:${scopeType}:${scopeId}`;
+    const winUsedKey = `usagewin:used:${scopeType}:${scopeId}`;
+    const winStartKey = `usagewin:start:${scopeType}:${scopeId}`;
 
-    // ✅ Opcional: registrar devices usados pela conta (para auditoria)
-    // (não limita, só registra)
     if (userId) {
       const userDevicesKey = `userdevices:${userId}`;
-      // sadd/smembers existem no @vercel/kv (Redis)
       await kv.sadd(userDevicesKey, deviceId);
       await kv.expire(userDevicesKey, 60 * 60 * 24 * 365);
     }
 
-    // =========================
-    // LEAD (mantém)
-    // =========================
     const leadJson = (await kv.get(leadKey)) || "{}";
     let lead;
     try {
@@ -105,8 +90,7 @@ export default async function handler(req, res) {
     await kv.expire(leadKey, 60 * 60 * 24 * 365);
 
     // =========================
-    // CONTROLE: 7 por 25h (janela com TTL)
-    // Agora é POR CONTA quando userId existir.
+    // CONTROLE DE USO
     // =========================
     const usedInWindow = await kv.incr(winUsedKey);
 
@@ -116,23 +100,32 @@ export default async function handler(req, res) {
       await kv.expire(winStartKey, WINDOW_TTL);
     }
 
-    if (usedInWindow > TRIAL_LIMIT) {
+    if (usedInWindow > IMAGE_LIMIT) {
+      const startMsRaw = await kv.get(winStartKey);
+      const startMs = Number(startMsRaw || Date.now());
+      const releaseAt = startMs + WINDOW_TTL * 1000;
+
       return res.status(429).json({
-        error: "Trial limit reached",
-        code: "TRIAL_LIMIT",
-        used: TRIAL_LIMIT,
-        limit: TRIAL_LIMIT,
-        scope: scopeType, // "user" ou "device"
+        error: "Image limit reached",
+        code: "IMAGE_LIMIT",
+        used: IMAGE_LIMIT,
+        limit: IMAGE_LIMIT,
+        windowDays: WINDOW_DAYS,
+        releaseAt,
+        scope: scopeType,
       });
     }
 
-    // =========================
-    // GERAÇÃO (igual seu projeto)
-    // =========================
-    const { imageBase64, style = "clean", mimeType = "image/jpeg", prompt = "" } =
-      req.body || {};
-    if (!imageBase64)
+    const {
+      imageBase64,
+      style = "clean",
+      mimeType = "image/jpeg",
+      prompt = "",
+    } = req.body || {};
+
+    if (!imageBase64) {
       return res.status(400).json({ error: "imageBase64 is required" });
+    }
 
     const MAX_BASE64_LEN = 4_500_000;
     if (typeof imageBase64 !== "string" || imageBase64.length > MAX_BASE64_LEN) {
@@ -214,7 +207,7 @@ Nunca use cinza.
 Nunca use preenchimento sólido para indicar sombra.
 Os tracejados devem ser mínimos, somente como complemento.
 
-ESPAÇOS NEGATIVOS:
+ESPAÇOS NEGATIVOS:
 Preserve totalmente os espaços brancos e áreas de highlight.
 Não preencha áreas de luz.
 Não desenhe dentro das áreas de brilho.
@@ -239,7 +232,7 @@ A imagem final deve estar sobre fundo totalmente branco (#FFFFFF), limpa e pront
 
 Gere somente a imagem final. Não retorne texto.
 `,
-clean: `
+      clean: `
 OBJETIVO (MODO CLEAN – RECRIAÇÃO TOTAL DO DESENHO):
 
 Você receberá a imagem de uma tatuagem aplicada na pele humana.
@@ -479,7 +472,9 @@ Não retorne nenhum texto.
     };
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
+    if (!apiKey) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
+    }
 
     const url =
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" +
@@ -528,17 +523,28 @@ Não retorne nenhum texto.
     const parts = json?.candidates?.[0]?.content?.parts || [];
     const inline = parts.find((p) => p?.inlineData?.data)?.inlineData?.data;
 
-    if (!inline) return res.status(500).json({ error: "Estamos em atualização, isso vai levar apenas uns minutos.", raw: json });
+    if (!inline) {
+      return res.status(500).json({
+        error: "Estamos em atualização, isso vai levar apenas uns minutos.",
+        raw: json,
+      });
+    }
 
     return res.status(200).json({
       imageBase64: inline,
-      trial: { used: usedInWindow, limit: TRIAL_LIMIT, scope: scopeType },
+      usage: {
+        used: usedInWindow,
+        limit: IMAGE_LIMIT,
+        scope: scopeType,
+        windowDays: WINDOW_DAYS,
+      },
     });
   } catch (err) {
     const msg =
       err?.name === "AbortError"
         ? "Timeout generating image"
         : err?.message || "Unexpected error";
+
     return res.status(500).json({ error: msg });
   }
 }
